@@ -1,0 +1,43 @@
+import { expect, type Page } from '@playwright/test';
+
+export async function gotoLogin(page: Page): Promise<void> {
+  await page.goto('/#/login');
+  await expect(page.getByRole('button', { name: /Try Demo Account/i })).toBeVisible();
+}
+
+export async function loginWithDemo(page: Page): Promise<void> {
+  await gotoLogin(page);
+  await page.getByRole('button', { name: /Try Demo Account/i }).click();
+  await expect(page).toHaveURL(/#\/$/);
+}
+
+export async function logoutFromMobileMenu(page: Page): Promise<void> {
+  // First button in mobile header is the menu toggle.
+  await page.locator('header button').first().click();
+  await page.getByRole('button', { name: /Logout/i }).click();
+  await expect(page).toHaveURL(/#\/login$/);
+}
+
+export async function registerViaForm(
+  page: Page,
+  creds: { username: string; email: string; password: string }
+): Promise<void> {
+  await gotoLogin(page);
+  await page.getByRole('button', { name: /^Register$/ }).click();
+  await page.getByPlaceholder('Username').fill(creds.username);
+  await page.getByPlaceholder('Email').fill(creds.email);
+  await page.getByPlaceholder('Password').fill(creds.password);
+  await page.getByRole('button', { name: /Create Account/i }).click();
+  await expect(page).toHaveURL(/#\/$/);
+}
+
+export async function loginViaForm(
+  page: Page,
+  creds: { email: string; password: string }
+): Promise<void> {
+  await gotoLogin(page);
+  await page.getByPlaceholder('Email').fill(creds.email);
+  await page.getByPlaceholder('Password').fill(creds.password);
+  await page.getByRole('button', { name: /Sign In/i }).click();
+  await expect(page).toHaveURL(/#\/$/);
+}

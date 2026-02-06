@@ -1,0 +1,1055 @@
+# NexusTrade — Complete AI Reference Guide
+# Last Updated: 2025
+# Bundle: 348KB gzipped | 14 pages | 90+ files | 0 build errors
+
+## ============================================================
+## 1. OVERVIEW
+## ============================================================
+
+NexusTrade is a production-ready forex and crypto trading web application.
+It uses live market data, AI-driven analysis via Google Gemini, real-time
+charts, paper trading, and a premium dark-mode UI.
+
+Stack: React 18 + TypeScript + Vite + Tailwind CSS + Zustand
+Charts: lightweight-charts v5 (TradingView)
+Data Charts: Recharts
+Icons: lucide-react
+Font: JetBrains Mono (numbers), system sans-serif (text)
+No backend — fully client-side SPA with localStorage persistence.
+Designed for easy backend migration (service abstraction layer).
+
+## ============================================================
+## 2. PROJECT STRUCTURE
+## ============================================================
+
+```
+src/
+├── App.tsx                    # Router with 14 routes, error boundary
+├── main.tsx                   # React entry point
+├── index.css                  # Tailwind + custom animations + design tokens
+├── types/
+│   └── index.ts               # All TypeScript interfaces (15+ types)
+├── stores/
+│   ├── authStore.ts           # User auth with SHA-256, localStorage
+│   ├── settingsStore.ts       # Theme, API keys, preferences
+│   ├── marketStore.ts         # Live crypto + forex prices, WebSocket
+│   ├── portfolioStore.ts      # Positions, orders, trades, balance
+│   ├── watchlistStore.ts      # Named watchlists with assets
+│   ├── alertStore.ts          # Price alerts with browser notifications
+│   └── chatStore.ts           # AI chat conversation history
+├── services/
+│   ├── coinGeckoClient.ts     # CoinGecko API (primary crypto data)
+│   ├── coinCapClient.ts       # CoinCap API (fallback + WebSocket)
+│   ├── forexClient.ts         # ExchangeRate-API + Frankfurter (forex)
+│   ├── geminiService.ts       # Google Gemini AI (analysis, sentiment, chat)
+│   ├── chatService.ts         # Context builder for AI chat
+│   ├── newsService.ts         # NewsData.io + curated fallback
+│   ├── calendarData.ts        # Economic calendar events
+│   └── cache.ts               # Two-tier cache (memory + localStorage)
+├── utils/
+│   ├── technicalIndicators.ts # RSI, MACD, SMA, EMA, BB, Stochastic
+│   ├── riskCalculations.ts    # VaR, drawdown, Monte Carlo, correlation
+│   └── treemap.ts             # Squarified treemap algorithm
+├── components/
+│   ├── layout/
+│   │   ├── Layout.tsx         # Main shell: sidebar, header, bottom nav
+│   │   ├── GlobalSearch.tsx   # Search modal with / shortcut
+│   │   └── NotificationCenter.tsx # Bell dropdown with alerts
+│   ├── ui/
+│   │   ├── Premium.tsx        # 11 premium components (Button, Card, etc.)
+│   │   ├── AnimatedPrice.tsx  # Price flash + number animation hooks
+│   │   ├── PageTransition.tsx # Fade-up page entrance animation
+│   │   └── ToastContainer.tsx # Toast system with spring physics
+│   └── trading/
+│       ├── TradingChart.tsx   # TradingView chart with indicators
+│       ├── IndicatorCharts.tsx # RSI, MACD, Stochastic sub-charts
+│       ├── OrderForm.tsx      # Buy/Sell form with AI evaluation
+│       └── AIChatDrawer.tsx   # Slide-out AI chat with streaming
+├── pages/
+│   ├── Login.tsx              # Auth page (login/register/demo)
+│   ├── Dashboard.tsx          # Bento grid with portfolio hero
+│   ├── Markets.tsx            # Asset list with filters and sort
+│   ├── AssetDetail.tsx        # Charts + indicators + trading + AI
+│   ├── Portfolio.tsx          # Positions, P&L, equity curve
+│   ├── WatchlistPage.tsx      # Named watchlists management
+│   ├── News.tsx               # News feed with sentiment
+│   ├── CalendarPage.tsx       # Economic calendar
+│   ├── Alerts.tsx             # Price alert management
+│   ├── BacktestPage.tsx       # Strategy backtesting
+│   ├── HeatmapPage.tsx        # Market treemap visualization
+│   ├── MultiChart.tsx         # Multi-panel trading terminal
+│   ├── RiskDashboard.tsx      # Risk analytics and Monte Carlo
+│   └── Settings.tsx           # API keys, theme, profile, export
+```
+
+## ============================================================
+## 3. TYPE SYSTEM (src/types/index.ts)
+## ============================================================
+
+### Asset (Crypto)
+```typescript
+interface Asset {
+  id: string;              // "bitcoin", "ethereum"
+  symbol: string;          // "BTC", "ETH"
+  name: string;            // "Bitcoin"
+  price: number;           // Current USD price
+  changePercent24h: number; // 24h change percentage
+  marketCap: number;
+  volume24h: number;
+  image?: string;          // CoinGecko image URL
+  sparkline7d?: number[];  // 7-day price array
+  high24h?: number;
+  low24h?: number;
+}
+```
+
+### ForexPair
+```typescript
+interface ForexPair {
+  pair: string;       // "EUR/USD"
+  base: string;       // "EUR"
+  quote: string;      // "USD"
+  rate: number;       // Current exchange rate
+  change24h: number;  // 24h change percentage
+  bid?: number;
+  ask?: number;
+}
+```
+
+### Position
+```typescript
+interface Position {
+  id: string;
+  symbol: string;          // "BTC", "EUR/USD"
+  type: 'crypto' | 'forex';
+  side: 'long' | 'short';
+  entryPrice: number;
+  quantity: number;
+  currentPrice: number;
+  pnl: number;            // Unrealized P&L
+  pnlPercent: number;
+  stopLoss?: number;
+  takeProfit?: number;
+  openedAt: string;        // ISO date
+}
+```
+
+### Order
+```typescript
+interface Order {
+  id: string;
+  symbol: string;
+  side: 'buy' | 'sell';
+  type: 'market' | 'limit' | 'stop';
+  quantity: number;
+  price?: number;          // For limit/stop orders
+  status: 'pending' | 'filled' | 'cancelled';
+  createdAt: string;
+}
+```
+
+### TradeRecord
+```typescript
+interface TradeRecord {
+  id: string;
+  symbol: string;
+  side: 'buy' | 'sell';
+  type: 'crypto' | 'forex';
+  entryPrice: number;
+  exitPrice: number;
+  quantity: number;
+  pnl: number;
+  fees: number;
+  openedAt: string;
+  closedAt: string;
+}
+```
+
+### Alert
+```typescript
+interface Alert {
+  id: string;
+  symbol: string;
+  type: 'price_above' | 'price_below' | 'percent_change';
+  targetValue: number;
+  currentPrice: number;
+  isActive: boolean;
+  isTriggered: boolean;
+  triggeredAt?: string;
+  createdAt: string;
+}
+```
+
+### Watchlist
+```typescript
+interface Watchlist {
+  id: string;
+  name: string;
+  symbols: string[];
+  createdAt: string;
+}
+```
+
+### Settings
+```typescript
+interface Settings {
+  theme: 'dark' | 'light';
+  apiKeys: {
+    gemini: string;
+    newsdata: string;
+  };
+  notifications: boolean;
+  confirmTrades: boolean;
+  defaultLeverage: number;
+}
+```
+
+### ChatMessage
+```typescript
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
+```
+
+## ============================================================
+## 4. STATE MANAGEMENT (Zustand Stores)
+## ============================================================
+
+All stores use Zustand with localStorage persistence.
+Import pattern: `import { useXxxStore } from '@/stores/xxxStore'`
+
+### authStore
+```
+State:
+  user: { id, email, displayName } | null
+  isAuthenticated: boolean
+
+Actions:
+  login(email, password) → boolean
+  register(email, password, displayName) → boolean
+  loginDemo() → void          // Creates demo account with $100K
+  logout() → void
+  
+Persistence: localStorage key "nexustrade_users" and "nexustrade_auth"
+Password hashing: SHA-256 (client-side)
+```
+
+### settingsStore
+```
+State:
+  settings: Settings object (theme, apiKeys, notifications, etc.)
+
+Actions:
+  updateTheme(theme) → void
+  updateApiKey(service, key) → void
+  updateSettings(partial) → void
+  
+Persistence: localStorage key "nexustrade_settings"
+```
+
+### marketStore
+```
+State:
+  cryptoAssets: Asset[]          // 25+ coins from CoinGecko
+  forexPairs: ForexPair[]        // 8 major pairs
+  isLoadingCrypto: boolean
+  isLoadingForex: boolean
+  error: string | null
+  lastUpdated: number
+  wsConnected: boolean
+
+Actions:
+  fetchCrypto() → void          // Calls CoinGecko API
+  fetchForex() → void           // Calls ExchangeRate-API
+  startWebSocket() → void       // CoinCap WebSocket for real-time
+  stopWebSocket() → void
+  getAssetPrice(symbol) → number
+  
+Auto-refresh: Crypto every 60s, Forex every 30s
+WebSocket: CoinCap streams BTC, ETH, SOL, ADA, DOT, DOGE prices
+```
+
+### portfolioStore
+```
+State:
+  virtualBalance: number         // Starting $100,000
+  positions: Position[]
+  orders: Order[]
+  tradeHistory: TradeRecord[]    // Closed trades (renamed from 'trades')
+  balanceHistory: { date, value }[]
+
+Actions:
+  executeTrade(symbol, side, type, quantity, price, options?) → void
+  closePosition(positionId) → void
+  closeAllPositions() → void
+  cancelOrder(orderId) → void
+  resetPortfolio() → void       // Reset to $100K
+  
+Fee structure: 0.1% crypto, 0.01% forex
+Slippage: 0.01-0.05% random on market orders
+```
+
+### watchlistStore
+```
+State:
+  watchlists: Watchlist[]
+
+Actions:
+  createWatchlist(name) → void
+  deleteWatchlist(id) → void
+  addSymbol(watchlistId, symbol) → void
+  removeSymbol(watchlistId, symbol) → void
+  isInAnyWatchlist(symbol) → boolean
+```
+
+### alertStore
+```
+State:
+  alerts: Alert[]
+
+Actions:
+  createAlert(symbol, type, targetValue, currentPrice) → void
+  deleteAlert(id) → void
+  toggleAlert(id) → void
+  checkAlerts(getCurrentPrice) → void   // Runs every 5 seconds
+  clearTriggered() → void
+```
+
+### chatStore
+```
+State:
+  messages: ChatMessage[]
+  isOpen: boolean
+  isLoading: boolean
+
+Actions:
+  sendMessage(content) → void    // Sends to Gemini with context
+  toggleChat() → void
+  clearHistory() → void
+```
+
+## ============================================================
+## 5. API SERVICES
+## ============================================================
+
+### CoinGecko (Primary Crypto) — src/services/coinGeckoClient.ts
+```
+Base URL: https://api.coingecko.com/api/v3
+Rate Limit: 10-30 calls/minute (free tier)
+No API key required.
+
+Endpoints used:
+  GET /coins/markets?vs_currency=usd&order=market_cap_desc&per_page=25
+    → Returns Asset[] with price, market cap, volume, sparkline
+    
+  GET /coins/{id}/ohlc?vs_currency=usd&days={1,7,30,90,365}
+    → Returns OHLCV arrays for chart: [timestamp, open, high, low, close]
+    
+  GET /simple/price?ids={ids}&vs_currencies=usd&include_24hr_change=true
+    → Returns simple price lookup
+```
+
+### CoinCap (Fallback + WebSocket) — src/services/coinCapClient.ts
+```
+Base URL: https://api.coincap.io/v2
+WebSocket: wss://ws.coincap.io/prices?assets=bitcoin,ethereum,...
+No API key required.
+
+REST Endpoints:
+  GET /assets?limit=25 → Fallback for CoinGecko
+  GET /assets/{id}/history?interval=d1 → Historical data
+
+WebSocket:
+  Streams real-time prices for subscribed assets
+  Auto-reconnect with exponential backoff (1s → 2s → 4s → max 30s)
+  Updates marketStore.cryptoAssets prices in real-time
+```
+
+### ExchangeRate-API (Primary Forex) — src/services/forexClient.ts
+```
+Base URL: https://api.exchangerate-api.com/v4/latest/USD
+No API key required (free tier).
+Returns all major currency rates vs USD.
+
+Frankfurter (Fallback + Historical):
+  Base URL: https://api.frankfurter.app
+  GET /latest?from=USD → Current rates
+  GET /{date}..{date}?from={base}&to={quote} → Historical for charts
+```
+
+### Google Gemini (AI) — src/services/geminiService.ts
+```
+Base URL: https://generativelanguage.googleapis.com/v1beta
+Model: gemini-2.0-flash
+API Key: User-provided via Settings → stored in settingsStore
+Rate Limit: 15 requests/minute, 1500/day (free tier)
+
+Functions:
+  analyzeMarket(symbol, price, indicators, recentPrices)
+    → Returns: { signal, confidence, reasoning, risks, stopLoss, takeProfit }
+    → Prompt includes RSI, MACD, BB, SMA values + price action
+    → Falls back to rule-based analysis if no API key
+    
+  analyzeSentiment(headlines)
+    → Returns: { score (-100 to 100), label, impact, themes, reasoning }
+    → Prompt includes news headlines
+    → Falls back to keyword-based sentiment if no API key
+    
+  generateChatResponse(messages, context)
+    → Returns: string (AI response)
+    → Context includes portfolio, positions, market prices, watchlist
+    
+  evaluateTrade(symbol, side, quantity, price, portfolioContext)
+    → Returns: { riskRating, suggestion, reasoning }
+    → Used in OrderForm "Ask AI Before Trading" feature
+```
+
+### NewsData.io — src/services/newsService.ts
+```
+Base URL: https://newsdata.io/api/1/news
+API Key: User-provided via Settings
+Categories: business, crypto
+Falls back to curated sample articles (20 articles) when no key.
+```
+
+## ============================================================
+## 6. PREMIUM UI COMPONENTS (src/components/ui/Premium.tsx)
+## ============================================================
+
+All components accept className prop for customization.
+
+### PremiumButton
+```tsx
+<PremiumButton 
+  variant="primary|success|danger|ghost|glass"
+  size="sm|md|lg"
+  loading={boolean}
+  onClick={handler}
+>Label</PremiumButton>
+
+Features: Gradient backgrounds, glow on hover, press-down scale, loading spinner
+```
+
+### PremiumCard
+```tsx
+<PremiumCard 
+  glass={boolean}           // Glassmorphism effect
+  glow="none|blue|purple|green|red|gold"  // Hover glow color
+  hover={boolean}           // Lift on hover
+  className={string}
+>Content</PremiumCard>
+
+Features: Backdrop blur, gradient border, shadow transitions
+```
+
+### PremiumInput
+```tsx
+<PremiumInput
+  label={string}            // Floating label
+  value={string}
+  onChange={handler}
+  type={string}
+  error={string}            // Error state with shake animation
+  icon={ReactNode}
+/>
+
+Features: Floating label animation, focus glow ring, error shake
+```
+
+### PremiumModal
+```tsx
+<PremiumModal
+  isOpen={boolean}
+  onClose={handler}
+  title={string}
+  size="sm|md|lg"
+>Content</PremiumModal>
+
+Features: Backdrop blur, scale-in animation, Escape to close
+```
+
+### PremiumToggle
+```tsx
+<PremiumToggle
+  enabled={boolean}
+  onChange={handler}
+  label={string}
+/>
+
+Features: Gradient track, spring-feel knob, glow when active
+```
+
+### PremiumBadge
+```tsx
+<PremiumBadge
+  variant="green|red|yellow|blue|purple|gray|indigo"
+  size="sm|md"
+  pulse={boolean}           // Pulsing dot indicator
+>Label</PremiumBadge>
+```
+
+### StatCard
+```tsx
+<StatCard
+  title={string}
+  value={string}
+  change={string}           // "+5.2%" shown in green/red
+  icon={ReactNode}
+  subtitle={string}
+/>
+```
+
+### TabBar
+```tsx
+<TabBar
+  tabs={[{ id: string, label: string, count?: number }]}
+  activeTab={string}
+  onChange={(id) => void}
+/>
+
+Features: Segmented control style, active highlight, count badges
+```
+
+### SectionHeader
+```tsx
+<SectionHeader
+  title={string}
+  icon={ReactNode}
+  action={ReactNode}        // Optional right-side action button
+/>
+```
+
+### EmptyState
+```tsx
+<EmptyState
+  icon={ReactNode}
+  title={string}
+  description={string}
+  action={ReactNode}        // Optional CTA button
+/>
+```
+
+### GlassDivider
+```tsx
+<GlassDivider />            // Gradient fade horizontal divider
+```
+
+## ============================================================
+## 7. ANIMATION SYSTEM
+## ============================================================
+
+### Hooks (src/components/ui/AnimatedPrice.tsx)
+
+```tsx
+// Smoothly animate number changes
+const animated = useAnimatedNumber(value, duration?)
+// Returns: number that interpolates from old to new value
+
+// Track price direction for flash effect
+const { direction, previousValue } = usePriceDirection(price)
+// Returns: 'up' | 'down' | 'none'
+```
+
+### Components
+
+```tsx
+// Price with flash animation on change
+<AnimatedPrice value={42150.50} prefix="$" decimals={2} />
+// Flashes green on uptick, red on downtick
+
+// Percentage with color coding
+<AnimatedPercent value={5.23} />
+// Green for positive, red for negative, with arrow icon
+
+// Page entrance animation
+<PageTransition>
+  <Outlet />
+</PageTransition>
+// Fade-up animation on route change
+```
+
+### CSS Animations (in index.css)
+```
+@keyframes tickUp       — green text flash (0.6s)
+@keyframes tickDown     — red text flash (0.6s)
+@keyframes bgFlashUp    — green background highlight (0.8s)
+@keyframes bgFlashDown  — red background highlight (0.8s)
+@keyframes pageEnter    — fade + slide up (0.3s)
+@keyframes staggerIn    — staggered child entrance (0.4s)
+@keyframes scaleIn      — scale from 95% to 100% (0.2s)
+@keyframes slideInRight — slide from right edge (0.3s)
+@keyframes glowPulse    — pulsing green glow (2s loop)
+@keyframes shimmer      — loading shimmer sweep (1.5s loop)
+@keyframes toastIn      — spring slide-in from right (0.4s)
+@keyframes toastOut     — slide-out to right (0.3s)
+@keyframes bellPulse    — notification bell pulse (1s loop)
+@keyframes pulse-dot    — pulsing dot indicator (1.5s loop)
+```
+
+### CSS Utility Classes
+```css
+.animate-stagger-in     — staggered entrance for lists
+.animate-fast-stagger   — faster variant (30ms delay)
+.price-flash-up         — apply green flash to element
+.price-flash-down       — apply red flash to element  
+.glass                  — glassmorphism (blur 12px, semi-transparent)
+.glass-strong           — stronger glassmorphism (blur 20px)
+.glass-card             — glass + border + shadow
+.card-hover             — hover lift + shadow transition
+.text-gradient-primary  — indigo-to-purple gradient text
+.text-gradient-profit   — green gradient text
+.text-gradient-loss     — red gradient text
+.text-gradient-gold     — amber gradient text
+.shadow-premium         — layered premium shadow
+.shadow-glow-indigo     — indigo glow shadow
+.shadow-glow-emerald    — emerald glow shadow
+.shadow-glow-red        — red glow shadow
+```
+
+## ============================================================
+## 8. PAGE-BY-PAGE GUIDE
+## ============================================================
+
+### Login (/login)
+- Stores: authStore
+- Features: Email/password login, registration, demo account
+- Demo account: Creates user with $100K virtual balance
+
+### Dashboard (/)
+- Stores: marketStore, portfolioStore, watchlistStore, alertStore
+- Layout: Bento grid (1-col mobile → 4-col desktop)
+- Widgets: Portfolio hero card, quick stats, top gainers/losers, 
+  watchlist, AI insights, recent trades, alerts summary, news, forex rates
+- All prices use AnimatedPrice with flash effect
+- All numbers use useAnimatedNumber for smooth transitions
+
+### Markets (/markets)
+- Stores: marketStore
+- Features: 25+ crypto + 8 forex, search, filter (All/Crypto/Forex),
+  sort by name/price/change/marketCap, grid/list toggle
+- Uses PremiumCard, PremiumBadge, TabBar
+- Click any asset → navigates to /asset/{id}
+
+### Asset Detail (/asset/:id)
+- Stores: marketStore, portfolioStore, watchlistStore, settingsStore
+- Components: TradingChart, IndicatorCharts, OrderForm
+- Chart: Candlestick/Line/Area with 5 timeframes (1D/7D/1M/3M/1Y)
+- Indicators: SMA(20,50), EMA(20), RSI(14), MACD(12,26,9), BB(20,2), Stochastic
+- AI Analysis: Gemini signal with confidence, reasoning, SL/TP
+- Trading: Full order form with market/limit/stop, AI pre-trade evaluation
+- Crosshair tooltip showing OHLCV data
+- Watchlist star toggle
+
+### Portfolio (/portfolio)
+- Stores: portfolioStore, marketStore
+- Charts: Equity curve (with $100K benchmark), Drawdown, Daily P&L bars
+- Tabs: Positions, Pending Orders, Trade History
+- Stats: Balance, total P&L, win rate, fees, positions count
+- Actions: Close position, close all, cancel order, reset portfolio
+
+### Watchlist (/watchlist)
+- Stores: watchlistStore, marketStore
+- Features: Multiple named watchlists, create/rename/delete lists,
+  add/remove assets, live prices with AnimatedPrice
+
+### News (/news)
+- Services: newsService, geminiService
+- Features: Live feed (NewsData.io) or curated fallback,
+  category filter (All/Crypto/Forex/Economy), search,
+  AI sentiment analysis on headlines, sentiment badges
+
+### Calendar (/calendar)
+- Data: calendarData.ts (28 event types, 10 countries)
+- Features: Economic events with impact ratings (High/Medium/Low),
+  country filter, impact filter, list/grid views, 7-90 day range
+
+### Alerts (/alerts)
+- Stores: alertStore, marketStore
+- Features: Create price alerts (above/below/% change),
+  browser push notifications, in-app toasts, sound alert,
+  auto-check every 5 seconds, activate/pause/delete
+
+### Backtest (/backtest)
+- Strategies: SMA Crossover, RSI Oversold, MACD Crossover, EMA Trend
+- Assets: BTC, ETH, SOL, ADA, DOGE, DOT, XRP
+- Periods: 30, 90, 180, 365 days
+- Output: Equity curve (Recharts), trade log, stats
+  (total return, win rate, max drawdown, Sharpe ratio, profit factor)
+
+### Heatmap (/heatmap)
+- Utils: treemap.ts (squarified treemap algorithm)
+- Features: Rectangle treemap colored by performance,
+  size by market cap/volume/equal, timeframe 1H/24H/7D/30D,
+  hover tooltip with details, click to navigate
+
+### Terminal (/terminal)
+- Components: Uses TradingChart internally
+- Features: 1/2/4 panel layout, each panel independent
+  (select asset, timeframe, chart type), responsive
+  (auto-downgrades to single panel on mobile)
+
+### Risk Dashboard (/risk)
+- Utils: riskCalculations.ts
+- Widgets: Risk score gauge (0-100), Value at Risk (95% VaR),
+  Max Drawdown, Monte Carlo simulation (500 paths),
+  Correlation matrix, Exposure breakdown (pie), Position size calculator
+
+### Settings (/settings)
+- Stores: settingsStore, authStore
+- Sections: API Keys (Gemini + NewsData with validation),
+  Appearance (dark/light theme), Profile, Trading Preferences,
+  Data Management (JSON export, clear data), Audit Log
+
+## ============================================================
+## 9. AI INTEGRATION DETAILS
+## ============================================================
+
+### Setup
+User enters free Gemini API key in Settings → API Keys.
+Get key from: https://aistudio.google.com/apikey
+
+### Market Analysis Prompt Template
+```
+You are a financial market analyst. Analyze {symbol} at ${price}.
+Technical indicators: RSI={rsi}, MACD={macd}, Signal={signal},
+BB Upper={upper}, BB Lower={lower}, SMA20={sma20}, SMA50={sma50}
+Recent prices: [last 10 closes]
+Provide JSON: { signal, confidence, reasoning, risks, stopLoss, takeProfit }
+```
+
+### Sentiment Analysis Prompt Template
+```
+Analyze market sentiment from these headlines: [headlines]
+Return JSON: { score (-100 to 100), label, impact, themes[], reasoning }
+```
+
+### Chat Context Injection
+Every chat message includes:
+- Current portfolio value and P&L
+- Open positions with individual P&L
+- Watchlist symbols
+- Active alerts
+- Live prices of mentioned assets
+- Current page the user is viewing
+
+### Fallback (No API Key)
+- Market analysis: Rule-based multi-indicator confluence scoring
+  (RSI zones + MACD crossover + BB position + SMA trend → weighted score)
+- Sentiment: Keyword-based scoring (~50 weighted financial terms)
+- Chat: Returns helpful message about adding API key
+
+## ============================================================
+## 10. CACHING AND RATE LIMITING
+## ============================================================
+
+### Two-Tier Cache (src/services/cache.ts)
+```
+L1: In-memory Map (instant, lost on page refresh)
+L2: localStorage (persists, 5MB limit)
+
+TTL by data type:
+  Market prices: 30 seconds
+  OHLCV chart data: 5 minutes
+  Forex rates: 60 seconds
+  News: 5 minutes
+  AI analysis: 5 minutes
+  AI sentiment: 10 minutes
+
+On API failure: Returns stale cache data (any age) as fallback
+```
+
+### Rate Limiting
+```
+Per-API budgets enforced client-side:
+  CoinGecko: 8 requests/minute
+  CoinCap: 20 requests/minute
+  ExchangeRate-API: 5 requests/minute
+  Frankfurter: 10 requests/minute
+  Gemini: 10 requests/minute (well under 15/min limit)
+```
+
+### Error Fallback Chain
+```
+Primary API → Fallback API → Cached Data → Stale Cache → Error UI
+Example: CoinGecko fails → CoinCap → localStorage cache → old cache → error banner
+```
+
+## ============================================================
+## 11. TECHNICAL INDICATORS (src/utils/technicalIndicators.ts)
+## ============================================================
+
+All functions are pure — no side effects, easily testable.
+
+```typescript
+calculateSMA(data: number[], period: number): number[]
+calculateEMA(data: number[], period: number): number[]
+calculateRSI(data: number[], period: number): number[]
+calculateMACD(data: number[], fast?, slow?, signal?): { macd, signal, histogram }[]
+calculateBollingerBands(data: number[], period?, stdDev?): { upper, middle, lower }[]
+calculateStochastic(high: number[], low: number[], close: number[], period?): { k, d }[]
+findSupportResistance(data: number[]): { support: number[], resistance: number[] }
+```
+
+## ============================================================
+## 12. RISK CALCULATIONS (src/utils/riskCalculations.ts)
+## ============================================================
+
+```typescript
+calculateVaR(returns: number[], confidence: number): number
+calculateMaxDrawdown(equityCurve: number[]): number
+calculateSharpeRatio(returns: number[], riskFreeRate?): number
+calculateCorrelation(a: number[], b: number[]): number
+monteCarloSimulation(returns: number[], days: number, paths: number): number[][]
+calculatePositionSize(capital, riskPercent, entryPrice, stopLoss): number
+calculateRiskScore(portfolio): number  // 0-100 composite score
+```
+
+## ============================================================
+## 13. CUSTOMIZATION GUIDE
+## ============================================================
+
+### Add a New Crypto Asset
+1. CoinGecko already returns top 25 — increase `per_page` param in coinGeckoClient.ts
+2. Add to CoinCap WebSocket subscription in marketStore.ts
+
+### Add a New Forex Pair
+1. Add pair config in forexClient.ts `FOREX_PAIRS` array
+2. Format: { pair: "GBP/JPY", base: "GBP", quote: "JPY" }
+
+### Add a New Technical Indicator
+1. Add calculation function in technicalIndicators.ts
+2. Add overlay series in TradingChart.tsx (for overlays like SMA)
+3. Or add sub-chart in IndicatorCharts.tsx (for oscillators like RSI)
+4. Add toggle entry in AssetDetail.tsx indicator menu
+
+### Add a New Backtest Strategy
+1. In BacktestPage.tsx, add to `strategies` array
+2. Implement the signal logic in the `runBacktest` function
+3. Return 'buy' | 'sell' | 'hold' for each candle
+
+### Add a New Page
+1. Create page component in src/pages/NewPage.tsx
+2. Add route in App.tsx: `<Route path="/newpage" element={<NewPage />} />`
+3. Add nav item in Layout.tsx sidebar `navItems` array
+4. Add icon import from lucide-react
+
+### Change Theme Colors
+1. Edit tailwind.config.js for base palette
+2. Edit CSS custom properties in index.css for glass/glow effects
+3. Dark mode uses Tailwind's `dark:` prefix throughout
+
+### Add a New AI Feature
+1. Add function in geminiService.ts with prompt template
+2. Call from component with try/catch and loading state
+3. Always provide rule-based fallback for no-API-key users
+4. Cache results using cache.ts with appropriate TTL
+
+## ============================================================
+## 14. DESIGN TOKENS
+## ============================================================
+
+### Colors (Tailwind Classes)
+```
+Background:    dark:bg-gray-900 / bg-gray-50
+Cards:         dark:bg-gray-800 / bg-white
+Borders:       dark:border-gray-700 / border-gray-200
+Primary text:  dark:text-white / text-gray-900
+Secondary:     dark:text-gray-400 / text-gray-500
+Accent:        indigo-500 (primary), emerald-500 (profit), red-500 (loss)
+AI accent:     purple-500 / purple-600
+Warning:       amber-500
+```
+
+### Glassmorphism
+```css
+.glass {
+  background: rgba(17, 24, 39, 0.6);    /* gray-900 at 60% */
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(75, 85, 99, 0.3); /* gray-600 at 30% */
+}
+```
+
+### Typography
+```
+Numbers/prices: JetBrains Mono (font-mono)
+Body text: System sans-serif (font-sans)
+Sizes: text-xs (12px), text-sm (14px), text-base (16px), 
+       text-lg (18px), text-xl (20px), text-2xl (24px), text-3xl (30px)
+```
+
+### Spacing
+```
+Card padding: p-4 (16px) mobile, p-6 (24px) desktop
+Section gaps: space-y-4 or gap-4
+Page padding: p-4 mobile, p-6 desktop
+Border radius: rounded-lg (8px) cards, rounded-xl (12px) modals
+```
+
+## ============================================================
+## 15. BACKEND MIGRATION GUIDE
+## ============================================================
+
+### Architecture: Service Abstraction Layer
+Every data operation goes through a service function.
+To add a backend, swap the implementation — UI code doesn't change.
+
+### Current (V1 — Client-Side)
+```
+Component → Store → localStorage
+Component → Service → External API (direct)
+```
+
+### Future (V2 — With Backend)
+```
+Component → Store → Backend API → PostgreSQL
+Component → Service → Backend API → External API (proxied)
+```
+
+### Migration Steps
+1. Create backend (NestJS/Express + PostgreSQL + Redis)
+2. Create REST API endpoints mirroring store actions
+3. Swap store persistence from localStorage to fetch() calls
+4. Move API keys to backend environment variables
+5. Proxy all external API calls through backend
+6. Add real JWT authentication
+
+### Recommended Backend Endpoints
+```
+POST   /api/auth/register
+POST   /api/auth/login
+GET    /api/auth/me
+GET    /api/portfolio
+POST   /api/portfolio/trade
+DELETE /api/portfolio/position/:id
+GET    /api/watchlists
+POST   /api/watchlists
+GET    /api/alerts
+POST   /api/alerts
+GET    /api/market/crypto
+GET    /api/market/forex
+GET    /api/market/ohlcv/:symbol
+POST   /api/ai/analyze
+POST   /api/ai/chat
+GET    /api/news
+GET    /api/calendar
+POST   /api/backtest
+```
+
+## ============================================================
+## 16. COMMON CODE PATTERNS
+## ============================================================
+
+### Creating a New Store
+```typescript
+import { create } from 'zustand';
+
+interface MyState {
+  items: Item[];
+  addItem: (item: Item) => void;
+}
+
+export const useMyStore = create<MyState>((set, get) => ({
+  items: JSON.parse(localStorage.getItem('nexustrade_myitems') || '[]'),
+  
+  addItem: (item) => {
+    const items = [...get().items, item];
+    localStorage.setItem('nexustrade_myitems', JSON.stringify(items));
+    set({ items });
+  },
+}));
+```
+
+### Making an API Call with Fallback
+```typescript
+async function fetchData(): Promise<Data> {
+  // Check cache first
+  const cached = cache.get<Data>('cache_key');
+  if (cached) return cached;
+  
+  try {
+    // Primary API
+    const response = await fetch(PRIMARY_URL);
+    const data = await response.json();
+    cache.set('cache_key', data, 60000); // Cache 60s
+    return data;
+  } catch {
+    try {
+      // Fallback API
+      const response = await fetch(FALLBACK_URL);
+      return await response.json();
+    } catch {
+      // Return stale cache
+      const stale = cache.getStale<Data>('cache_key');
+      if (stale) return stale;
+      throw new Error('All sources failed');
+    }
+  }
+}
+```
+
+### Error Handling in Components
+```tsx
+const [error, setError] = useState<string | null>(null);
+const [loading, setLoading] = useState(false);
+
+const loadData = async () => {
+  setLoading(true);
+  setError(null);
+  try {
+    await store.fetchData();
+  } catch (err) {
+    setError(err instanceof Error ? err.message : 'Failed to load');
+  } finally {
+    setLoading(false);
+  }
+};
+```
+
+## ============================================================
+## 17. KNOWN LIMITATIONS
+## ============================================================
+
+1. Client-side only — API keys visible in browser (use your own keys)
+2. localStorage limit ~5MB — sufficient for typical usage
+3. Data lost if browser storage cleared — no cloud sync
+4. Alerts only work while app is open in browser
+5. CoinGecko free tier: 10-30 req/min (may throttle on heavy usage)
+6. Gemini free tier: 15 req/min, 1500/day
+7. Paper trading only — no real money, no real exchange connections
+8. Forex charts use daily data (no intraday for free forex APIs)
+9. No social features (sharing, leaderboards) — requires backend
+10. Single user per browser (multi-user requires backend auth)
+
+## ============================================================
+## 18. BUILD AND DEVELOPMENT
+## ============================================================
+
+```bash
+npm run dev          # Start dev server (localhost:5173)
+npm run build        # Production build → dist/
+npm run preview      # Preview production build
+
+# Key files:
+# vite.config.ts     — Vite configuration (do NOT edit directly)
+# tailwind.config.js — Tailwind theme customization
+# tsconfig.json      — TypeScript configuration
+# index.html         — Entry HTML with font imports
+```
+
+### Path Aliases
+```
+@ → src/            (configured in vite.config.ts and tsconfig.json)
+Usage: import { useAuthStore } from '@/stores/authStore'
+```
+
+### Environment
+```
+Node.js 18+
+npm 9+
+TypeScript 5+
+React 18+
+Vite 5+
+```
