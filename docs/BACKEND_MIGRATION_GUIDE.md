@@ -1,4 +1,4 @@
-# NexusTrade — Backend Migration Guide
+# Hama Fx — Backend Migration Guide
 
 > **📊 Status: V1 COMPLETE (Client-Side) — This guide is for FUTURE V2 backend development**
 

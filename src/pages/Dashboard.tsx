@@ -93,7 +93,7 @@ export default function Dashboard() {
   const pnlPercent = totalPnL.percent;
 
   useEffect(() => {
-    document.title = 'Dashboard — NexusTrade';
+    document.title = 'Dashboard — HamaFX';
     fetchCrypto();
     fetchForex();
     const wsCleanup = startWebSocket();

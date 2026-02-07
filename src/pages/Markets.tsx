@@ -95,7 +95,7 @@ export default function Markets() {
   const [sortAsc, setSortAsc] = useState(false);
 
   useEffect(() => {
-    document.title = 'Markets — NexusTrade';
+    document.title = 'Markets — HamaFX';
     if (cryptoAssets.length === 0) fetchCrypto();
     if (forexPairs.length === 0) fetchForex();
   }, [cryptoAssets.length, forexPairs.length, fetchCrypto, fetchForex]);

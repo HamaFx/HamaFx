@@ -67,7 +67,7 @@ export default function News() {
   }, [category]);
 
   useEffect(() => {
-    document.title = 'News — NexusTrade';
+    document.title = 'News — HamaFX';
     loadNews();
   }, [loadNews]);
 

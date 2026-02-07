@@ -51,7 +51,7 @@ export default function Login() {
 
   const handleDemoLogin = async () => {
     setLoading(true);
-    const demoEmail = 'demo@nexustrade.app';
+    const demoEmail = 'demo@hamafx.app';
     const demoPass = 'demo123';
     // Try login first, if fails, register
     const loginResult = await login(demoEmail, demoPass);
@@ -78,9 +78,9 @@ export default function Login() {
             <TrendingUp className="w-7 h-7 text-white" />
           </div>
           <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">
-            NexusTrade
+            HamaFX
           </h1>
-          <p className="text-sm text-slate-400 mt-1">AI-Powered Trading Intelligence</p>
+          <p className="text-sm text-slate-400 mt-1">AI Trading Intelligence</p>
         </div>
 
         {/* Auth Card */}
@@ -192,7 +192,7 @@ export default function Login() {
         </div>
 
         <p className="text-center text-[10px] text-slate-600 leading-relaxed">
-          ⚠️ NexusTrade is for educational purposes only. Not financial advice.
+          ⚠️ Hama Fx is for educational purposes only. Not financial advice.
           <br />Paper trading uses simulated funds. All data stored locally.
         </p>
       </div>

@@ -1,4 +1,4 @@
-# NexusTrade — Premium Feature Implementation Order
+# Hama Fx — Premium Feature Implementation Order
 
 > **📊 Status: ALL 4 PREMIUM FEATURES COMPLETE**
 

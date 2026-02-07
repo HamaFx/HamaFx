@@ -1,7 +1,8 @@
 {
-  "name": "react-vite-tailwind",
+  "name": "hamafx-trading-platform",
   "private": true,
   "version": "0.0.0",
+  "description": "Hama Fx — AI Trading Intelligence platform for forex and crypto paper trading.",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -1,8 +1,10 @@
 import { create } from 'zustand';
 import type { AppSettings, ApiKeyConfig } from '@/types';
 import { useAuthStore } from '@/stores/authStore';
+import { getItemWithMigration } from '@/utils/storageMigration';
 
-const SETTINGS_KEY_PREFIX = 'nexus_settings_';
+const SETTINGS_KEY_PREFIX = 'hamafx_settings_';
+const LEGACY_SETTINGS_KEY_PREFIX = 'nexus_settings_';
 const LEGACY_SETTINGS_KEY = 'nexus_settings';
 const DEMO_USER_ID = 'demo';
 
@@ -41,6 +43,10 @@ const defaultSettings: AppSettings = {
 
 export function getSettingsStorageKey(userId: string): string {
   return `${SETTINGS_KEY_PREFIX}${userId}`;
+}
+
+function getLegacyScopedSettingsStorageKey(userId: string): string {
+  return `${LEGACY_SETTINGS_KEY_PREFIX}${userId}`;
 }
 
 function getCurrentUserId(): string {
@@ -92,16 +98,18 @@ function loadSettingsForUser(userId: string = getCurrentUserId()): AppSettings {
   const storage = getStorage();
   if (!storage) return mergeSettings();
 
-  const scopedSettings = parseStoredSettings(storage.getItem(getSettingsStorageKey(userId)));
+  const scopedSettings = parseStoredSettings(
+    getItemWithMigration(
+      getSettingsStorageKey(userId),
+      [getLegacyScopedSettingsStorageKey(userId), LEGACY_SETTINGS_KEY],
+      storage
+    )
+  );
   if (scopedSettings) {
-    return mergeSettings(scopedSettings);
-  }
-
-  // Backward-compatibility migration from old shared key.
-  const legacySettings = parseStoredSettings(storage.getItem(LEGACY_SETTINGS_KEY));
-  if (legacySettings) {
-    const merged = mergeSettings(legacySettings);
-    storage.setItem(getSettingsStorageKey(userId), JSON.stringify(merged));
+    const merged = mergeSettings(scopedSettings);
+    if (JSON.stringify(scopedSettings) !== JSON.stringify(merged)) {
+      saveSettings(merged, userId);
+    }
     return merged;
   }
 

@@ -103,7 +103,7 @@ export default function AssetDetail() {
 
   useEffect(() => {
     if (asset) {
-      document.title = `${asset.symbol} — NexusTrade`;
+      document.title = `${asset.symbol} — HamaFX`;
     }
     if (cryptoAssets.length === 0) fetchCrypto();
     if (forexPairs.length === 0) fetchForex();

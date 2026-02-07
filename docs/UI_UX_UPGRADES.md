@@ -1,4 +1,4 @@
-# NexusTrade — UI/UX Upgrade Phases
+# Hama Fx — UI/UX Upgrade Phases
 
 > **📊 Status: ALL 5 PHASES COMPLETE**
 

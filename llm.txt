@@ -1,4 +1,4 @@
-# NexusTrade — Complete AI Reference Guide
+# Hama Fx — Complete AI Reference Guide
 # Last Updated: 2025
 # Bundle: 348KB gzipped | 14 pages | 90+ files | 0 build errors
 
@@ -6,7 +6,7 @@
 ## 1. OVERVIEW
 ## ============================================================
 
-NexusTrade is a production-ready forex and crypto trading web application.
+Hama Fx is a production-ready forex and crypto trading web application.
 It uses live market data, AI-driven analysis via Google Gemini, real-time
 charts, paper trading, and a premium dark-mode UI.
 
@@ -233,7 +233,7 @@ Actions:
   loginDemo() → void          // Creates demo account with $100K
   logout() → void
   
-Persistence: localStorage key "nexustrade_users" and "nexustrade_auth"
+Persistence: localStorage key "hamafx_users" and "hamafx_auth"
 Password hashing: SHA-256 (client-side)
 ```
 
@@ -247,7 +247,7 @@ Actions:
   updateApiKey(service, key) → void
   updateSettings(partial) → void
   
-Persistence: localStorage key "nexustrade_settings"
+Persistence: localStorage key "hamafx_settings"
 ```
 
 ### marketStore
@@ -952,11 +952,11 @@ interface MyState {
 }
 
 export const useMyStore = create<MyState>((set, get) => ({
-  items: JSON.parse(localStorage.getItem('nexustrade_myitems') || '[]'),
+  items: JSON.parse(localStorage.getItem('hamafx_myitems') || '[]'),
   
   addItem: (item) => {
     const items = [...get().items, item];
-    localStorage.setItem('nexustrade_myitems', JSON.stringify(items));
+    localStorage.setItem('hamafx_myitems', JSON.stringify(items));
     set({ items });
   },
 }));

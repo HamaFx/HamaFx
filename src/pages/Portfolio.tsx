@@ -56,7 +56,7 @@ export default function Portfolio() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
-    document.title = 'Portfolio — NexusTrade';
+    document.title = 'Portfolio — HamaFX';
     loadPortfolio();
     snapshotBalance();
   }, [loadPortfolio, snapshotBalance]);

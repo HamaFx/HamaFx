@@ -14,7 +14,7 @@ test.describe('Mobile Auth', () => {
     const id = Date.now();
     const creds = {
       username: `mobile${id}`,
-      email: `mobile-${id}@nexustrade.test`,
+      email: `mobile-${id}@hamafx.test`,
       password: 'test1234',
     };
 

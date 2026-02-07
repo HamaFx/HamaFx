@@ -75,7 +75,7 @@ function buildFullContext(): string {
   ].join('\n\n');
 }
 
-const SYSTEM_PROMPT = `You are NexusTrade AI, an expert trading assistant for a paper trading platform. You have access to the user's portfolio, positions, watchlist, alerts, and live market data.
+const SYSTEM_PROMPT = `You are HamaFX AI, an expert trading assistant for a paper trading platform. You have access to the user's portfolio, positions, watchlist, alerts, and live market data.
 
 RULES:
 1. Be concise but insightful. Use bullet points when listing.
@@ -176,7 +176,7 @@ function generateLocalResponse(message: string): string {
   }
 
   if (lower.includes('help') || lower.includes('what can you do')) {
-    return `🤖 **NexusTrade AI Assistant**\n\nI can help with:\n• 📊 Portfolio analysis & risk assessment\n• 📈 Market analysis & price insights\n• 💡 Trade ideas & strategy discussion\n• 🔔 Alert & watchlist suggestions\n• 📚 Trading concepts & education\n\n⚡ *For full AI capabilities, add your free Gemini API key in Settings → API Keys.*`;
+    return `🤖 **HamaFX AI Assistant**\n\nI can help with:\n• 📊 Portfolio analysis & risk assessment\n• 📈 Market analysis & price insights\n• 💡 Trade ideas & strategy discussion\n• 🔔 Alert & watchlist suggestions\n• 📚 Trading concepts & education\n\n⚡ *For full AI capabilities, add your free Gemini API key in Settings → API Keys.*`;
   }
 
   return `I can help with portfolio analysis, market insights, and trading questions.\n\n${buildPortfolioContext()}\n\n${buildMarketContext()}\n\n💡 *For detailed AI responses, add a free Gemini API key in Settings → API Keys.*`;

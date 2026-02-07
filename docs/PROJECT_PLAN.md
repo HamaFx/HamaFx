@@ -1,4 +1,4 @@
-# NexusTrade — Forex & Crypto Trading Platform
+# Hama Fx — Forex & Crypto Trading Platform
 ## Master Project Plan
 
 > **📊 V1 Status: COMPLETE + V1.1 HARDENING ACTIVE** — All P0/P1 features implemented. PR quality gate, mobile E2E smoke, mobile UX polish, split-chunk build, and risk guardrails are now implemented in frontend scope.
@@ -7,7 +7,7 @@
 
 ## 1. Executive Summary
 
-**NexusTrade** is a production-grade, browser-based trading intelligence platform that combines live forex and crypto market data, real-time news, **LLM-powered AI analysis (Google Gemini)**, paper trading, and portfolio management into a single, polished mobile-first experience. The app targets retail traders who want institutional-grade tools without the complexity.
+**Hama Fx** is a production-grade, browser-based trading intelligence platform that combines live forex and crypto market data, real-time news, **LLM-powered AI analysis (Google Gemini)**, paper trading, and portfolio management into a single, polished mobile-first experience. The app targets retail traders who want institutional-grade tools without the complexity.
 
 > **Deployment Note:** V1 is a front-end SPA deployed as a static bundle. However, **every service is behind an abstraction layer (interface → adapter pattern)** so the entire backend can be swapped from localStorage/direct-API to a real server without changing any UI code.
 

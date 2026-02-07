@@ -11,15 +11,20 @@ import { getChatStorageKey } from '@/stores/chatStore';
 import { PremiumCard, PremiumButton, PremiumBadge, PremiumInput, PremiumToggle, SectionHeader, EmptyState, GlassDivider } from '@/components/ui/Premium';
 import type { Alert, Watchlist } from '@/types';
 import { getStorageUsageKb, safeJsonParse } from '@/utils/storage';
+import { getItemWithMigration } from '@/utils/storageMigration';
 
 type SettingsTab = 'apikeys' | 'profile' | 'preferences' | 'notifications' | 'data' | 'audit';
 const STORAGE_LIMIT_KB = 5000;
-const PORTFOLIO_KEY_PREFIX = 'nexus_portfolio_';
-const TRADES_KEY_PREFIX = 'nexus_trades_';
+const PORTFOLIO_KEY_PREFIX = 'hamafx_portfolio_';
+const TRADES_KEY_PREFIX = 'hamafx_trades_';
+const LEGACY_SCOPED_PORTFOLIO_KEY_PREFIX = 'nexus_portfolio_';
+const LEGACY_SCOPED_TRADES_KEY_PREFIX = 'nexus_trades_';
 const LEGACY_PORTFOLIO_KEY = 'nexus_portfolio';
 const LEGACY_TRADES_KEY = 'nexus_trades';
-const WATCHLISTS_KEY = 'nexus_watchlists';
-const ALERTS_KEY = 'nexus_alerts';
+const WATCHLISTS_KEY = 'hamafx_watchlists';
+const ALERTS_KEY = 'hamafx_alerts';
+const LEGACY_WATCHLISTS_KEY = 'nexus_watchlists';
+const LEGACY_ALERTS_KEY = 'nexus_alerts';
 
 export default function Settings() {
   const [activeTab, setActiveTab] = useState<SettingsTab>('apikeys');
@@ -36,13 +41,25 @@ export default function Settings() {
   const updateTradingSettings = (partial: Partial<typeof settings.trading>) =>
     updateSettings({ trading: { ...settings.trading, ...partial } });
 
-  useEffect(() => { document.title = 'Settings — NexusTrade'; }, []);
+  useEffect(() => { document.title = 'Settings — HamaFX'; }, []);
 
   const exportUserData = () => {
-    const portfolioRaw = localStorage.getItem(`${PORTFOLIO_KEY_PREFIX}${userId}`) || localStorage.getItem(LEGACY_PORTFOLIO_KEY);
-    const tradesRaw = localStorage.getItem(`${TRADES_KEY_PREFIX}${userId}`) || localStorage.getItem(LEGACY_TRADES_KEY);
-    const allWatchlists = safeJsonParse<Watchlist[]>(localStorage.getItem(WATCHLISTS_KEY), []);
-    const allAlerts = safeJsonParse<Alert[]>(localStorage.getItem(ALERTS_KEY), []);
+    const portfolioRaw = getItemWithMigration(`${PORTFOLIO_KEY_PREFIX}${userId}`, [
+      `${LEGACY_SCOPED_PORTFOLIO_KEY_PREFIX}${userId}`,
+      LEGACY_PORTFOLIO_KEY,
+    ]);
+    const tradesRaw = getItemWithMigration(`${TRADES_KEY_PREFIX}${userId}`, [
+      `${LEGACY_SCOPED_TRADES_KEY_PREFIX}${userId}`,
+      LEGACY_TRADES_KEY,
+    ]);
+    const allWatchlists = safeJsonParse<Watchlist[]>(
+      getItemWithMigration(WATCHLISTS_KEY, [LEGACY_WATCHLISTS_KEY]),
+      []
+    );
+    const allAlerts = safeJsonParse<Alert[]>(
+      getItemWithMigration(ALERTS_KEY, [LEGACY_ALERTS_KEY]),
+      []
+    );
 
     const data = {
       version: '1.1',
@@ -50,7 +67,10 @@ export default function Settings() {
       userId,
       portfolio: safeJsonParse<Record<string, unknown>>(portfolioRaw, {}),
       trades: safeJsonParse<Record<string, unknown>[]>(tradesRaw, []),
-      settings: safeJsonParse(localStorage.getItem(getSettingsStorageKey(userId)), settings),
+      settings: safeJsonParse(
+        getItemWithMigration(getSettingsStorageKey(userId), [`nexus_settings_${userId}`, 'nexus_settings']),
+        settings
+      ),
       watchlists: allWatchlists.filter((watchlist) => watchlist.userId === userId),
       alerts: allAlerts.filter((alert) => alert.userId === userId),
       chat: safeJsonParse<Record<string, unknown>[]>(localStorage.getItem(getChatStorageKey(userId)), []),
@@ -61,7 +81,7 @@ export default function Settings() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `nexustrade-export-${userId}-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `hamafx-export-${userId}-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -282,7 +302,7 @@ export default function Settings() {
             </div>
             <div>
               <h3 className="text-xl font-bold">{user?.username || 'User'}</h3>
-              <p className="text-sm text-slate-400">{user?.email || 'demo@nexustrade.app'}</p>
+              <p className="text-sm text-slate-400">{user?.email || 'demo@hamafx.app'}</p>
               <div className="flex items-center gap-2 mt-2">
                 <PremiumBadge variant="info" size="xs" dot>Active</PremiumBadge>
                 <span className="text-[10px] text-slate-600">Member since {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Today'}</span>

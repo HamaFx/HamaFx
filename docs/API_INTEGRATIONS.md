@@ -1,4 +1,4 @@
-# NexusTrade — API Integrations & Data Sources
+# Hama Fx — API Integrations & Data Sources
 
 > **📊 Status: ALL INTEGRATIONS COMPLETE** — 5 APIs integrated, caching + rate limiting + fallbacks all working.
 

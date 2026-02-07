@@ -1,12 +1,14 @@
 import { create } from 'zustand';
 import type { Watchlist, WatchlistItem, AssetType } from '@/types';
 import { useAuthStore } from '@/stores/authStore';
+import { getItemWithMigration } from '@/utils/storageMigration';
 
 function generateId(): string {
   return crypto.randomUUID?.() || Math.random().toString(36).substring(2) + Date.now().toString(36);
 }
 
-const WATCHLISTS_KEY = 'nexus_watchlists';
+const WATCHLISTS_KEY = 'hamafx_watchlists';
+const LEGACY_WATCHLISTS_KEY = 'nexus_watchlists';
 
 function getCurrentUserId(): string {
   return useAuthStore.getState().user?.id || 'demo';
@@ -14,7 +16,7 @@ function getCurrentUserId(): string {
 
 function loadAllWatchlists(): Watchlist[] {
   try {
-    const stored = localStorage.getItem(WATCHLISTS_KEY);
+    const stored = getItemWithMigration(WATCHLISTS_KEY, [LEGACY_WATCHLISTS_KEY]);
     if (stored) return JSON.parse(stored);
   } catch { /* ignore */ }
   return [];

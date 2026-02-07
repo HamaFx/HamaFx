@@ -51,7 +51,7 @@ export default function WatchlistPage() {
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    document.title = 'Watchlists — NexusTrade';
+    document.title = 'Watchlists — HamaFX';
     if (watchlists.length > 0 && !activeWatchlistId) {
       setActiveWatchlist(watchlists[0].id);
     }

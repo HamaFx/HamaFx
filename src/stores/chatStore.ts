@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { useAuthStore } from '@/stores/authStore';
+import { getItemWithMigration } from '@/utils/storageMigration';
 
 export interface ChatMessage {
   id: string;
@@ -23,12 +24,18 @@ interface ChatState {
   loadMessages: () => void;
 }
 
-const CHAT_KEY_PREFIX = 'nexustrade-chat_';
+const CHAT_KEY_PREFIX = 'hamafx_chat_';
+const LEGACY_CHAT_KEY_PREFIX = 'nexustrade-chat_';
+const LEGACY_SHARED_CHAT_KEY = 'nexus_chat';
 const DEMO_USER_ID = 'demo';
 const MAX_MESSAGES = 50;
 
 export function getChatStorageKey(userId: string): string {
   return `${CHAT_KEY_PREFIX}${userId}`;
+}
+
+function getLegacyChatStorageKey(userId: string): string {
+  return `${LEGACY_CHAT_KEY_PREFIX}${userId}`;
 }
 
 function getCurrentUserId(): string {
@@ -46,7 +53,11 @@ function loadMessagesFromStorage(userId: string = getCurrentUserId()): ChatMessa
     const storage = getStorage();
     if (!storage) return [];
 
-    const stored = storage.getItem(getChatStorageKey(userId));
+    const stored = getItemWithMigration(
+      getChatStorageKey(userId),
+      [getLegacyChatStorageKey(userId), LEGACY_SHARED_CHAT_KEY],
+      storage
+    );
     if (!stored) return [];
 
     const parsed = JSON.parse(stored) as ChatMessage[];

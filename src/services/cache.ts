@@ -1,13 +1,16 @@
 // Two-tier cache: L1 (in-memory) → L2 (localStorage) → API call
 // Backend migration: swap this for RedisCacheService
 
+import { getItemWithMigration } from '@/utils/storageMigration';
+
 interface CacheEntry<T> {
   data: T;
   expiresAt: number; // Unix timestamp ms
 }
 
 const memoryCache = new Map<string, CacheEntry<unknown>>();
-const STORAGE_PREFIX = 'nexus_cache_';
+const STORAGE_PREFIX = 'hamafx_cache_';
+const LEGACY_STORAGE_PREFIX = 'nexus_cache_';
 const MAX_STORAGE_ENTRIES = 50; // Prevent localStorage bloat
 
 export const cacheService = {
@@ -21,7 +24,9 @@ export const cacheService = {
 
     // L2: localStorage
     try {
-      const stored = localStorage.getItem(STORAGE_PREFIX + key);
+      const storageKey = STORAGE_PREFIX + key;
+      const legacyStorageKey = LEGACY_STORAGE_PREFIX + key;
+      const stored = getItemWithMigration(storageKey, [legacyStorageKey]);
       if (stored) {
         const entry: CacheEntry<T> = JSON.parse(stored);
         if (entry.expiresAt > Date.now()) {
@@ -30,7 +35,8 @@ export const cacheService = {
           return entry.data;
         }
         // Expired
-        localStorage.removeItem(STORAGE_PREFIX + key);
+        localStorage.removeItem(storageKey);
+        localStorage.removeItem(legacyStorageKey);
       }
     } catch {
       // Ignore storage errors
@@ -61,6 +67,7 @@ export const cacheService = {
     memoryCache.delete(key);
     try {
       localStorage.removeItem(STORAGE_PREFIX + key);
+      localStorage.removeItem(LEGACY_STORAGE_PREFIX + key);
     } catch {
       // Ignore
     }
@@ -75,7 +82,11 @@ export const cacheService = {
     try {
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const key = localStorage.key(i);
-        if (key?.startsWith(STORAGE_PREFIX) && key.includes(pattern)) {
+        if (
+          key &&
+          (key.startsWith(STORAGE_PREFIX) || key.startsWith(LEGACY_STORAGE_PREFIX)) &&
+          key.includes(pattern)
+        ) {
           localStorage.removeItem(key);
         }
       }
@@ -89,7 +100,7 @@ export const cacheService = {
       const cacheKeys: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key?.startsWith(STORAGE_PREFIX)) {
+        if (key && (key.startsWith(STORAGE_PREFIX) || key.startsWith(LEGACY_STORAGE_PREFIX))) {
           cacheKeys.push(key);
         }
       }
@@ -117,7 +128,7 @@ export const cacheService = {
     try {
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const key = localStorage.key(i);
-        if (key?.startsWith(STORAGE_PREFIX)) {
+        if (key && (key.startsWith(STORAGE_PREFIX) || key.startsWith(LEGACY_STORAGE_PREFIX))) {
           localStorage.removeItem(key);
         }
       }
@@ -132,7 +143,7 @@ export const cacheService = {
     if (memEntry) return memEntry.data;
 
     try {
-      const stored = localStorage.getItem(STORAGE_PREFIX + key);
+      const stored = getItemWithMigration(STORAGE_PREFIX + key, [LEGACY_STORAGE_PREFIX + key]);
       if (stored) {
         const entry: CacheEntry<T> = JSON.parse(stored);
         return entry.data;

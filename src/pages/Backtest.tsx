@@ -161,7 +161,7 @@ export default function BacktestPage() {
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<BacktestResult | null>(null);
 
-  useEffect(() => { document.title = 'Backtesting — NexusTrade'; }, []);
+  useEffect(() => { document.title = 'Backtesting — HamaFX'; }, []);
 
   const handleRun = useCallback(async () => {
     setRunning(true);

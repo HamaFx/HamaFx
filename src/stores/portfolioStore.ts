@@ -4,13 +4,16 @@ import { useAuthStore } from '@/stores/authStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { showToast } from '@/components/ui/ToastContainer';
 import { evaluateOrderRisk, formatGuardrailError } from '@/services/riskGuardrails';
+import { getItemWithMigration } from '@/utils/storageMigration';
 
 function generateId(): string {
   return crypto.randomUUID?.() || Math.random().toString(36).substring(2) + Date.now().toString(36);
 }
 
-const PORTFOLIO_KEY_PREFIX = 'nexus_portfolio_';
-const TRADES_KEY_PREFIX = 'nexus_trades_';
+const PORTFOLIO_KEY_PREFIX = 'hamafx_portfolio_';
+const TRADES_KEY_PREFIX = 'hamafx_trades_';
+const LEGACY_SCOPED_PORTFOLIO_KEY_PREFIX = 'nexus_portfolio_';
+const LEGACY_SCOPED_TRADES_KEY_PREFIX = 'nexus_trades_';
 const LEGACY_PORTFOLIO_KEY = 'nexus_portfolio';
 const LEGACY_TRADES_KEY = 'nexus_trades';
 
@@ -24,6 +27,14 @@ function getPortfolioKey(userId: string): string {
 
 function getTradesKey(userId: string): string {
   return `${TRADES_KEY_PREFIX}${userId}`;
+}
+
+function getLegacyScopedPortfolioKey(userId: string): string {
+  return `${LEGACY_SCOPED_PORTFOLIO_KEY_PREFIX}${userId}`;
+}
+
+function getLegacyScopedTradesKey(userId: string): string {
+  return `${LEGACY_SCOPED_TRADES_KEY_PREFIX}${userId}`;
 }
 
 interface PortfolioState {
@@ -67,9 +78,10 @@ function loadFromStorage(userId: string = getCurrentUserId()): {
   balanceHistory: BalanceSnapshot[];
 } {
   try {
-    const stored = localStorage.getItem(getPortfolioKey(userId));
-    const legacyStored = localStorage.getItem(LEGACY_PORTFOLIO_KEY);
-    const raw = stored || legacyStored;
+    const raw = getItemWithMigration(
+      getPortfolioKey(userId),
+      [getLegacyScopedPortfolioKey(userId), LEGACY_PORTFOLIO_KEY]
+    );
     if (raw) {
       const data = JSON.parse(raw);
       return {
@@ -92,9 +104,10 @@ function loadFromStorage(userId: string = getCurrentUserId()): {
 
 function loadTrades(userId: string = getCurrentUserId()): TradeRecord[] {
   try {
-    const stored = localStorage.getItem(getTradesKey(userId));
-    const legacyStored = localStorage.getItem(LEGACY_TRADES_KEY);
-    const raw = stored || legacyStored;
+    const raw = getItemWithMigration(
+      getTradesKey(userId),
+      [getLegacyScopedTradesKey(userId), LEGACY_TRADES_KEY]
+    );
     if (raw) return JSON.parse(raw);
   } catch { /* ignore */ }
   return [];

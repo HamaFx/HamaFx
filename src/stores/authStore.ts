@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { User, AuditEntry, AuditAction } from '@/types';
+import { getItemWithMigration } from '@/utils/storageMigration';
 
 function generateId(): string {
   return crypto.randomUUID?.() || Math.random().toString(36).substring(2) + Date.now().toString(36);
@@ -47,11 +48,14 @@ interface AuthState {
   addAuditEntry: (action: AuditAction, details: string, metadata?: Record<string, unknown>) => void;
 }
 
-const USERS_KEY = 'nexus_users';
-const SESSION_KEY = 'nexus_auth';
-const AUDIT_KEY = 'nexus_audit';
-const PORTFOLIO_KEY_PREFIX = 'nexus_portfolio_';
-const TRADES_KEY_PREFIX = 'nexus_trades_';
+const USERS_KEY = 'hamafx_users';
+const LEGACY_USERS_KEY = 'nexus_users';
+const SESSION_KEY = 'hamafx_auth';
+const LEGACY_SESSION_KEY = 'nexus_auth';
+const AUDIT_KEY = 'hamafx_audit';
+const LEGACY_AUDIT_KEY = 'nexus_audit';
+const PORTFOLIO_KEY_PREFIX = 'hamafx_portfolio_';
+const TRADES_KEY_PREFIX = 'hamafx_trades_';
 
 function getPortfolioKey(userId: string): string {
   return `${PORTFOLIO_KEY_PREFIX}${userId}`;
@@ -63,7 +67,7 @@ function getTradesKey(userId: string): string {
 
 function getUsers(): StoredUser[] {
   try {
-    return JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+    return JSON.parse(getItemWithMigration(USERS_KEY, [LEGACY_USERS_KEY]) || '[]');
   } catch { return []; }
 }
 
@@ -73,7 +77,7 @@ function saveUsers(users: StoredUser[]) {
 
 function getAuditLog(): AuditEntry[] {
   try {
-    return JSON.parse(localStorage.getItem(AUDIT_KEY) || '[]');
+    return JSON.parse(getItemWithMigration(AUDIT_KEY, [LEGACY_AUDIT_KEY]) || '[]');
   } catch { return []; }
 }
 
@@ -143,12 +147,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: () => {
     get().addAuditEntry('LOGOUT', 'User logged out');
     localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(LEGACY_SESSION_KEY);
     set({ user: null, isAuthenticated: false });
   },
 
   restoreSession: () => {
     try {
-      const stored = localStorage.getItem(SESSION_KEY);
+      const stored = getItemWithMigration(SESSION_KEY, [LEGACY_SESSION_KEY]);
       if (stored) {
         const user = JSON.parse(stored) as User;
         set({ user, isAuthenticated: true });

@@ -1,4 +1,4 @@
-# NexusTrade — UI/UX Design System
+# Hama Fx — UI/UX Design System
 
 > **📊 Status: COMPLETE** — 14 pages, 60+ components, premium design system, full accessibility.
 

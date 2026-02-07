@@ -156,6 +156,38 @@ describe('portfolioStore integration', () => {
     expect(state.positions.length).toBeGreaterThan(0);
   });
 
+  it('migrates legacy scoped portfolio keys to canonical keys', () => {
+    setTestUser('migrate-user');
+    localStorage.setItem('nexus_portfolio_migrate-user', JSON.stringify({
+      virtualBalance: 123456,
+      totalDeposited: 100000,
+      positions: [],
+      orders: [],
+      balanceHistory: [],
+    }));
+    localStorage.setItem('nexus_trades_migrate-user', JSON.stringify([]));
+
+    usePortfolioStore.getState().loadPortfolio();
+    const state = usePortfolioStore.getState();
+    expect(state.virtualBalance).toBe(123456);
+    expect(state.tradeHistory).toEqual([]);
+
+    expect(localStorage.getItem('hamafx_portfolio_migrate-user')).not.toBeNull();
+    expect(localStorage.getItem('hamafx_trades_migrate-user')).toBe('[]');
+
+    const placed = usePortfolioStore.getState().placeOrder({
+      symbol: 'EURUSD',
+      name: 'Euro / US Dollar',
+      assetType: 'forex',
+      side: 'buy',
+      type: 'market',
+      quantity: 100,
+      price: 1.1,
+    });
+    expect(placed.success).toBe(true);
+    expect(localStorage.getItem('hamafx_portfolio_migrate-user')).toContain('"orders"');
+  });
+
   it('blocks market orders that exceed max position size guardrail', () => {
     useSettingsStore.getState().updateSettings({
       trading: {

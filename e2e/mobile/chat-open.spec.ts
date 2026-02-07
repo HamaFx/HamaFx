@@ -8,7 +8,7 @@ test.describe('Mobile Chat Drawer', () => {
     await loginWithDemo(page);
 
     await page.getByLabel('Open AI Chat').click();
-    await expect(page.getByText('NexusTrade AI')).toBeVisible();
+    await expect(page.getByText('HamaFX AI')).toBeVisible();
     await expect(page.getByPlaceholder(/Ask about markets/i)).toBeVisible();
   });
 });

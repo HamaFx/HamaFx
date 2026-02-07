@@ -1,4 +1,4 @@
-# NexusTrade — Data Model & Persistence Schema
+# Hama Fx — Data Model & Persistence Schema
 
 > **📊 Status: ALL ENTITIES IMPLEMENTED** — 10 entity types in localStorage, PostgreSQL schemas ready for V2.
 
@@ -16,18 +16,20 @@ Same data model, stored in PostgreSQL tables. The service abstraction layer mean
 
 ## 2. Storage Keys ✅ ALL IMPLEMENTED
 
+> Namespace migration note: canonical keys now use `hamafx_*` (formerly `nexus_*` in NexusTrade), with legacy read fallback during upgrade.
+
 | Key | Type | Status | Description |
 |-----|------|--------|-------------|
-| `nexus_auth` | Object | ✅ | Current user session |
-| `nexus_users` | Array | ✅ | Registered users |
-| `nexus_portfolio` | Object | ✅ | Positions, orders, balances |
-| `nexus_watchlists` | Array | ✅ | User watchlists |
-| `nexus_alerts` | Array | ✅ | Price/signal alerts |
-| `nexus_trades` | Array | ✅ | Trade history |
-| `nexus_settings` | Object | ✅ | App preferences + API keys |
-| `nexus_cache` | Object | ✅ | API response cache (L2) |
-| `nexus_audit` | Array | ✅ | System audit log |
-| `nexus_chat` | Array | ✅ | AI chat conversation history |
+| `hamafx_auth` | Object | ✅ | Current user session |
+| `hamafx_users` | Array | ✅ | Registered users |
+| `hamafx_portfolio_<userId>` | Object | ✅ | Positions, orders, balances |
+| `hamafx_watchlists` | Array | ✅ | User watchlists |
+| `hamafx_alerts` | Array | ✅ | Price/signal alerts |
+| `hamafx_trades_<userId>` | Array | ✅ | Trade history |
+| `hamafx_settings_<userId>` | Object | ✅ | App preferences + API keys |
+| `hamafx_cache_*` | Object | ✅ | API response cache (L2) |
+| `hamafx_audit` | Array | ✅ | System audit log |
+| `hamafx_chat_<userId>` | Array | ✅ | AI chat conversation history |
 
 ---
 

@@ -128,7 +128,7 @@ export default function AIChatDrawer() {
               <Bot size={18} className="text-white" />
             </div>
             <div>
-              <h2 className="font-bold text-white text-sm">NexusTrade AI</h2>
+              <h2 className="font-bold text-white text-sm">HamaFX AI</h2>
               <div className="flex items-center gap-1.5">
                 <div className={`w-1.5 h-1.5 rounded-full ${settings.apiKeys.gemini?.key ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
                 <span className="text-[10px] text-gray-400">

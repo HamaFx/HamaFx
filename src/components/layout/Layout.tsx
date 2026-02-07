@@ -82,7 +82,7 @@ export function Layout() {
             <TrendingUp className="w-4.5 h-4.5 text-white" />
           </div>
           <div>
-            <h1 className="text-base font-bold tracking-tight bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">NexusTrade</h1>
+            <h1 className="text-base font-bold tracking-tight bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">HamaFX</h1>
           </div>
         </div>
 
@@ -136,7 +136,7 @@ export function Layout() {
                 <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
                   <TrendingUp className="w-4.5 h-4.5 text-white" />
                 </div>
-                <span className="font-bold bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">NexusTrade</span>
+                <span className="font-bold bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">HamaFX</span>
               </div>
               <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg hover:bg-white/5">
                 <X className="w-5 h-5 text-slate-400" />
@@ -172,7 +172,7 @@ export function Layout() {
               <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
                 <TrendingUp className="w-3.5 h-3.5 text-white" />
               </div>
-              <span className="font-bold text-sm bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">NexusTrade</span>
+              <span className="font-bold text-sm bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">HamaFX</span>
             </div>
           </div>
 

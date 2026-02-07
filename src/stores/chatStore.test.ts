@@ -78,4 +78,23 @@ describe('chatStore', () => {
     expect(useChatStore.getState().messages).toHaveLength(0);
     expect(JSON.parse(localStorage.getItem(getChatStorageKey('alice')) || '[]')).toHaveLength(0);
   });
+
+  it('migrates legacy chat history key to canonical user key', () => {
+    const legacyMessages = [
+      {
+        id: 'legacy-1',
+        role: 'assistant',
+        content: 'legacy message',
+        timestamp: 1735689600000,
+      },
+    ];
+    localStorage.setItem('nexustrade-chat_migrate-user', JSON.stringify(legacyMessages));
+
+    setTestUser('migrate-user');
+    useChatStore.getState().loadMessages();
+
+    expect(useChatStore.getState().messages).toHaveLength(1);
+    expect(useChatStore.getState().messages[0].content).toBe('legacy message');
+    expect(JSON.parse(localStorage.getItem(getChatStorageKey('migrate-user')) || '[]')).toHaveLength(1);
+  });
 });

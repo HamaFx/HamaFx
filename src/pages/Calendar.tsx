@@ -77,7 +77,7 @@ export default function CalendarPage() {
   }, [events]);
 
   useEffect(() => {
-    document.title = 'Economic Calendar — NexusTrade';
+    document.title = 'Economic Calendar — HamaFX';
   }, []);
 
   return (

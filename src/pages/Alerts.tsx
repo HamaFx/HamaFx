@@ -31,7 +31,7 @@ export default function AlertsPage() {
   };
 
   useEffect(() => {
-    document.title = 'Alerts — NexusTrade';
+    document.title = 'Alerts — HamaFX';
     // Request notification permission
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();

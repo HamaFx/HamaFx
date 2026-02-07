@@ -1,4 +1,4 @@
-# NexusTrade — Architecture Decision Records
+# Hama Fx — Architecture Decision Records
 
 > **📊 Status: ALL 13 ADRs IMPLEMENTED**
 

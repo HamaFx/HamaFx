@@ -3,12 +3,14 @@ import type { Alert, AssetType } from '@/types';
 import { useAuthStore } from '@/stores/authStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { showToast } from '@/components/ui/ToastContainer';
+import { getItemWithMigration } from '@/utils/storageMigration';
 
 function generateId(): string {
   return crypto.randomUUID?.() || Math.random().toString(36).substring(2) + Date.now().toString(36);
 }
 
-const ALERTS_KEY = 'nexus_alerts';
+const ALERTS_KEY = 'hamafx_alerts';
+const LEGACY_ALERTS_KEY = 'nexus_alerts';
 
 function getCurrentUserId(): string {
   return useAuthStore.getState().user?.id || 'demo';
@@ -16,7 +18,7 @@ function getCurrentUserId(): string {
 
 function loadAllAlerts(): Alert[] {
   try {
-    const stored = localStorage.getItem(ALERTS_KEY);
+    const stored = getItemWithMigration(ALERTS_KEY, [LEGACY_ALERTS_KEY]);
     if (stored) return JSON.parse(stored);
   } catch { /* ignore */ }
   return [];
@@ -136,7 +138,7 @@ export const useAlertStore = create<AlertState>((set, get) => ({
           'Notification' in window &&
           Notification.permission === 'granted'
         ) {
-          new Notification(`NexusTrade Alert`, {
+          new Notification('HamaFX Alert', {
             body: `${alert.symbol} has ${alert.type.replace('_', ' ')} $${alert.targetValue}`,
             icon: '/favicon.ico',
           });

@@ -1,4 +1,4 @@
-# NexusTrade Codebase Audit
+# Hama Fx Codebase Audit
 Date: February 7, 2026
 
 ## 1) Architecture Summary
@@ -92,10 +92,10 @@ Date: February 7, 2026
 - `src/utils/treemap.test.ts`
 - Second-wave upgrades:
 - `src/stores/settingsStore.ts`
-- Migrated from shared `nexus_settings` to user-scoped `nexus_settings_<userId>`.
+- Migrated to canonical `hamafx_settings_<userId>` keys with one-time legacy fallback from `nexus_settings_<userId>` / `nexus_settings`.
 - Added robust nested settings merge and `loadUserSettings` for account transitions.
 - `src/stores/chatStore.ts`
-- Replaced global persisted chat history with user-scoped `nexustrade-chat_<userId>`.
+- Migrated to canonical `hamafx_chat_<userId>` keys with one-time legacy fallback from `nexustrade-chat_<userId>` / `nexus_chat`.
 - Added explicit `loadMessages` action for auth/user transitions.
 - `src/App.tsx`
 - Loads user-scoped settings/chat on auth state changes to prevent cross-user bleed.
@@ -131,3 +131,10 @@ Date: February 7, 2026
 - `src/stores/settingsStore.test.ts` expanded for migration/default coverage of new trading guardrail settings.
 - Remaining local limitation:
 - WebKit mobile smoke cannot execute in this machine without OS packages (`libicu74`, `libxml2`, `libflite1`); CI remains the authoritative WebKit gate.
+
+## 8) Rebrand and Storage Namespace Migration
+- Product branding has been reworked to Hama Fx (formerly NexusTrade), using:
+- `HamaFX` for logo/title/chrome surfaces.
+- `Hama Fx` for prose/documentation copy.
+- Canonical localStorage namespace now uses `hamafx_*` keys.
+- Backward compatibility is preserved via one-time migration + legacy read fallback from `nexus_*` / `nexustrade-*` keys.
