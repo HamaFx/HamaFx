@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, TrendingUp, TrendingDown, Bot, BarChart3,
@@ -68,23 +68,25 @@ export default function AssetDetail() {
   // Find asset
   const cryptoAsset = cryptoAssets.find(a => a.id === id);
   const forexPair = forexPairs.find(p => p.id === id);
-  const asset: (Asset & { assetType: string }) | null = cryptoAsset
-    ? { ...cryptoAsset, assetType: 'crypto' }
-    : forexPair
-    ? {
-        id: forexPair.id,
-        symbol: forexPair.symbol,
-        name: forexPair.name,
-        assetType: 'forex',
-        price: forexPair.rate,
-        change24h: forexPair.change24h,
-        changePercent24h: forexPair.changePercent24h,
-        high24h: forexPair.rate * 1.002,
-        low24h: forexPair.rate * 0.998,
-        volume24h: 0,
-        lastUpdated: new Date().toISOString(),
-      }
-    : null;
+  const asset: (Asset & { assetType: string }) | null = useMemo(() => (
+    cryptoAsset
+      ? { ...cryptoAsset, assetType: 'crypto' }
+      : forexPair
+      ? {
+          id: forexPair.id,
+          symbol: forexPair.symbol,
+          name: forexPair.name,
+          assetType: 'forex',
+          price: forexPair.rate,
+          change24h: forexPair.change24h,
+          changePercent24h: forexPair.changePercent24h,
+          high24h: forexPair.rate * 1.002,
+          low24h: forexPair.rate * 0.998,
+          volume24h: 0,
+          lastUpdated: new Date().toISOString(),
+        }
+      : null
+  ), [cryptoAsset, forexPair]);
 
   const [timeframe, setTimeframe] = useState<Timeframe>(TIMEFRAMES[2]); // 1M default
   const [chartType, setChartType] = useState<ChartType>('candlestick');

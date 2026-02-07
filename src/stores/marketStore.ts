@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import type { Asset, ForexPair, OHLCV } from '@/types';
-import { fetchCryptoMarkets, mapCoinGeckoToAsset } from '@/services/api/coinGecko';
+import { fetchCryptoMarkets, mapCoinGeckoToAsset, fetchCryptoOHLC } from '@/services/api/coinGecko';
 import { fetchCoinCapAssets, mapCoinCapToAsset, connectCoinCapWebSocket } from '@/services/api/coinCap';
-import { fetchForexRates, mapForexRatesToPairs, simulateForexTick } from '@/services/api/forex';
+import { fetchForexRates, mapForexRatesToPairs, simulateForexTick, fetchForexHistory, FOREX_PAIRS } from '@/services/api/forex';
 import { cacheService } from '@/services/cache';
 import { rateLimiter } from '@/services/rateLimiter';
 
@@ -251,7 +251,6 @@ export async function fetchOHLCVData(assetId: string, assetType: 'crypto' | 'for
 
   if (assetType === 'crypto') {
     try {
-      const { fetchCryptoOHLC } = await import('@/services/api/coinGecko');
       if (!rateLimiter.canMakeRequest('coingecko')) {
         return cacheService.getStale<OHLCV[]>(cacheKey) || [];
       }
@@ -273,7 +272,6 @@ export async function fetchOHLCVData(assetId: string, assetType: 'crypto' | 'for
 
   if (assetType === 'forex') {
     try {
-      const { fetchForexHistory, FOREX_PAIRS } = await import('@/services/api/forex');
       const pair = FOREX_PAIRS.find(p => p.id === assetId);
       if (!pair) return [];
       const history = await fetchForexHistory(pair.base, pair.quote, days);
