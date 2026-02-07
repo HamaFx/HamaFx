@@ -36,6 +36,7 @@ jobs:
       - name: Run live mobile smoke suite
         env:
           PLAYWRIGHT_BASE_URL: ${{ vars.LIVE_BASE_URL || secrets.LIVE_BASE_URL }}
+          PLAYWRIGHT_PROTECTION_BYPASS: ${{ vars.PROTECTION_BYPASS_SECRET || secrets.PROTECTION_BYPASS_SECRET }}
           PW_BROWSER: chromium
         run: npm run e2e:smoke
 

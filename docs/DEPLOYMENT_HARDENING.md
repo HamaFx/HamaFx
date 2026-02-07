@@ -30,6 +30,7 @@ Recommended values:
 GitHub Actions secrets required:
 - `LIVE_BASE_URL` for `.github/workflows/live-mobile-smoke.yml`
 - `PROD_HEALTHCHECK_URL` for `.github/workflows/uptime-monitor.yml`
+- `PROTECTION_BYPASS_SECRET` (optional, recommended) for protected deployments and live smoke/uptime headers.
 
 ## 3) Analytics + Speed Insights
 

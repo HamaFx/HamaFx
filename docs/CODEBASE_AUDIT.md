@@ -168,3 +168,31 @@ Date: February 7, 2026
 - Added deployment setup script for domain/env bootstrap: `scripts/vercel-prod-setup.sh`.
 - Added deployment runbook: `docs/DEPLOYMENT_HARDENING.md`.
 - Limitation observed during automation: GitHub branch protection API returns `403` for current private-repo plan; enable GitHub Pro or make repo public to activate branch protection.
+
+## 11) V2 Backend Foundation (Vercel)
+- Added V2 API namespace under `api/v2/*` for:
+- auth (`register`, `login`, `refresh`, `logout`, `me`)
+- portfolio/orders/trades/position close
+- watchlists/alerts/settings/chat/audit
+- market + news proxy routes
+- migration import and cron maintenance
+- Added shared server libraries in `api/_lib/*`:
+- env validation (`zod`)
+- postgres/drizzle client + schema
+- redis cache/rate-limit wrapper
+- JWT + refresh session utilities
+- state repository helpers + guardrail evaluation
+- Added Drizzle config and migration tooling:
+- `drizzle.config.ts`
+- npm scripts: `db:generate`, `db:migrate`, `db:studio`
+- Added frontend V2 backend mode support:
+- `VITE_BACKEND_MODE=off|shadow|on`
+- backend auth API client and token refresh flow
+- backend state sync orchestrator
+- settings UI migration assistant (`Dry Run` + `Import to Backend`)
+- Added backup/restore artifacts and documentation for V1 pre-V2 safety:
+- `backups/hamafx-v1-b386ec6-20260207-1707.tar.gz`
+- `backups/hamafx-pre-v2-working-tree-20260207-1707.tar.gz`
+- `docs/V1_BACKUP_RESTORE.md`
+- Added backend setup runbook:
+- `docs/V2_BACKEND_SETUP.md`

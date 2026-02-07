@@ -4,6 +4,8 @@ node_modules/
 # build outputs
 dist/
 coverage/
+backups/*.tar.gz
+backups/*.sha256
 
 # test artifacts
 playwright-report/

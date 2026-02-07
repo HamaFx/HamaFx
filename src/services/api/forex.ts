@@ -4,6 +4,8 @@
 
 const EXCHANGE_RATE_URL = 'https://open.er-api.com/v6/latest/USD';
 const FRANKFURTER_URL = 'https://api.frankfurter.app';
+import { isBackendEnabled } from '@/services/backend/config';
+import { backendFetch } from '@/services/backend/http';
 
 interface ForexRates {
   [currency: string]: number;
@@ -33,6 +35,10 @@ function calculateForexRate(rates: ForexRates, base: string, quote: string): num
 }
 
 export async function fetchForexRates(): Promise<ForexRates> {
+  if (isBackendEnabled()) {
+    return backendFetch<ForexRates>('/api/v2/market/forex?mode=latest');
+  }
+
   // Try ExchangeRate-API first
   try {
     const res = await fetch(EXCHANGE_RATE_URL);
@@ -56,6 +62,23 @@ export async function fetchForexHistory(
   quote: string,
   days: number
 ): Promise<{ date: string; rate: number }[]> {
+  if (isBackendEnabled()) {
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    const from = startDate.toISOString().split('T')[0];
+    const to = endDate.toISOString().split('T')[0];
+    const data = await backendFetch<{ rates: Record<string, Record<string, number>> }>(
+      `/api/v2/market/forex?mode=history&base=${encodeURIComponent(base)}&quote=${encodeURIComponent(quote)}&from=${from}&to=${to}`
+    );
+
+    const rows = Object.entries(data.rates ?? {}).map(([date, map]) => ({
+      date,
+      rate: map[quote] ?? 0,
+    }));
+    return rows.sort((a, b) => a.date.localeCompare(b.date));
+  }
+
   const endDate = new Date();
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);

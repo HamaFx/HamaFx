@@ -14,6 +14,8 @@ import type { Alert, Watchlist } from '@/types';
 import { getStorageUsageKb, safeJsonParse } from '@/utils/storage';
 import { getItemWithMigration } from '@/utils/storageMigration';
 import { readSettingsUrlState, writeSettingsUrlState } from '@/utils/urlState';
+import { backendModeLabel, runMigrationImport } from '@/services/backend/stateSync';
+import { isBackendEnabled } from '@/services/backend/config';
 
 type SettingsTab = 'apikeys' | 'profile' | 'preferences' | 'notifications' | 'data' | 'audit';
 const STORAGE_LIMIT_KB = 5000;
@@ -38,6 +40,8 @@ export default function Settings() {
   const [showGeminiKey, setShowGeminiKey] = useState(false);
   const [validatingGemini, setValidatingGemini] = useState(false);
   const [geminiError, setGeminiError] = useState('');
+  const [migrationBusy, setMigrationBusy] = useState(false);
+  const [migrationResult, setMigrationResult] = useState<string>('');
   const userId = user?.id || 'demo';
   const storageUsageKb = getStorageUsageKb();
   const storageUsagePercent = Math.min((storageUsageKb / STORAGE_LIMIT_KB) * 100, 100);
@@ -131,6 +135,29 @@ export default function Settings() {
     if (!newsKeyInput.trim()) return;
     setApiKey('newsdata', { key: newsKeyInput.trim(), addedAt: new Date().toISOString(), lastValidated: new Date().toISOString(), isValid: true });
     setNewsKeyInput('');
+  };
+
+  const runBackendMigration = async (dryRun: boolean) => {
+    if (!isBackendEnabled()) {
+      setMigrationResult('Backend mode is OFF. Set VITE_BACKEND_MODE=on or shadow to use migration.');
+      return;
+    }
+
+    setMigrationBusy(true);
+    setMigrationResult('');
+    try {
+      const report = await runMigrationImport(dryRun);
+      setMigrationResult(
+        `${dryRun ? 'Dry run' : 'Import'} completed: ` +
+          Object.entries(report.imported)
+            .map(([k, v]) => `${k}=${v}`)
+            .join(', ')
+      );
+    } catch (error) {
+      setMigrationResult(error instanceof Error ? error.message : 'Migration request failed');
+    } finally {
+      setMigrationBusy(false);
+    }
   };
 
   const tabs: { id: SettingsTab; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
@@ -507,6 +534,41 @@ export default function Settings() {
               </div>
             </PremiumCard>
           </div>
+
+          <PremiumCard glass className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-semibold">V2 Backend Migration</p>
+              <PremiumBadge variant={isBackendEnabled() ? 'success' : 'warning'} size="sm">
+                Mode: {backendModeLabel()}
+              </PremiumBadge>
+            </div>
+            <p className="text-xs text-slate-500">
+              Import your current local data (`hamafx_*`) into V2 backend. Run dry-run first, then commit import.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <PremiumButton
+                variant="ghost"
+                size="sm"
+                disabled={migrationBusy}
+                onClick={() => void runBackendMigration(true)}
+              >
+                Dry Run
+              </PremiumButton>
+              <PremiumButton
+                variant="primary"
+                size="sm"
+                disabled={migrationBusy}
+                onClick={() => void runBackendMigration(false)}
+              >
+                {migrationBusy ? 'Running...' : 'Import to Backend'}
+              </PremiumButton>
+            </div>
+            {migrationResult && (
+              <p className="text-xs text-slate-400 rounded-lg bg-nexus-elevated/60 px-3 py-2">
+                {migrationResult}
+              </p>
+            )}
+          </PremiumCard>
         </PremiumCard>
       )}
 

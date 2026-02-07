@@ -10,6 +10,9 @@ import { usePortfolioStore } from '@/stores/portfolioStore';
 import { useMarketStore } from '@/stores/marketStore';
 import { AnimatedPrice } from '@/components/ui/AnimatedPrice';
 import { readPortfolioUrlState, writePortfolioUrlState } from '@/utils/urlState';
+import { isBackendOn } from '@/services/backend/config';
+import { apiCancelOrder, apiClosePosition, apiFetchPortfolio } from '@/services/backend/tradingApi';
+import toast from 'react-hot-toast';
 import {
   PieChart as RechartsPie, Pie, Cell, ResponsiveContainer,
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -161,6 +164,59 @@ export default function Portfolio() {
   const toggleSort = (col: 'pnl' | 'value' | 'name') => {
     if (sortBy === col) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
     else { setSortBy(col); setSortDir('desc'); }
+  };
+
+  const refreshFromBackend = async () => {
+    const snapshot = await apiFetchPortfolio();
+    usePortfolioStore.setState({
+      virtualBalance: snapshot.virtualBalance,
+      totalDeposited: snapshot.totalDeposited,
+      positions: snapshot.positions as never,
+      orders: snapshot.orders as never,
+      tradeHistory: snapshot.tradeHistory as never,
+      balanceHistory: snapshot.balanceHistory as never,
+    });
+  };
+
+  const handleClosePosition = async (positionId: string, currentPrice: number) => {
+    try {
+      if (!isBackendOn()) {
+        closePosition(positionId, currentPrice);
+        return;
+      }
+      await apiClosePosition(positionId, currentPrice);
+      await refreshFromBackend();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Close position failed');
+    }
+  };
+
+  const handleCancelOrder = async (orderId: string) => {
+    try {
+      if (!isBackendOn()) {
+        cancelOrder(orderId);
+        return;
+      }
+      await apiCancelOrder(orderId);
+      await refreshFromBackend();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Cancel order failed');
+    }
+  };
+
+  const handleCloseAllPositions = async () => {
+    try {
+      if (!isBackendOn()) {
+        positions.forEach((pos) => closePosition(pos.id, pos.currentPrice));
+        return;
+      }
+      for (const pos of positions) {
+        await apiClosePosition(pos.id, pos.currentPrice);
+      }
+      await refreshFromBackend();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Close all positions failed');
+    }
   };
 
   return (
@@ -454,7 +510,7 @@ export default function Portfolio() {
                   </button>
                 ))}
                 {positions.length > 1 && (
-                  <button onClick={() => positions.forEach(pos => closePosition(pos.id, pos.currentPrice))}
+                  <button onClick={() => void handleCloseAllPositions()}
                     className="ml-auto text-xs text-red-400/70 hover:text-red-400 transition-colors">
                     Close All
                   </button>
@@ -500,7 +556,7 @@ export default function Portfolio() {
                             <span className="text-xs opacity-70 ml-1">({pos.unrealizedPnLPercent.toFixed(1)}%)</span>
                           </p>
                         </div>
-                        <button onClick={() => closePosition(pos.id, pos.currentPrice)}
+                        <button onClick={() => void handleClosePosition(pos.id, pos.currentPrice)}
                           className="px-3 py-2 min-h-11 md:min-h-0 md:px-2.5 md:py-1.5 rounded-lg text-xs text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-[color,background-color,opacity] duration-200 opacity-100 md:opacity-0 md:group-hover:opacity-100">
                           Close
                         </button>
@@ -534,7 +590,7 @@ export default function Portfolio() {
                       <p className="text-xs text-slate-500 font-mono">{order.type} @ ${order.price?.toFixed(2)} • Qty: {order.quantity.toFixed(4)}</p>
                     </div>
                   </div>
-                  <button onClick={() => cancelOrder(order.id)} className="p-2 rounded-xl hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition-colors">
+                  <button onClick={() => void handleCancelOrder(order.id)} className="p-2 rounded-xl hover:bg-red-500/10 text-slate-500 hover:text-red-400 transition-colors">
                     <X className="w-4 h-4" />
                   </button>
                 </div>

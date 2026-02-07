@@ -16,7 +16,7 @@ export default [
     ],
   },
   {
-    files: ['src/**/*.{ts,tsx}', 'vite.config.ts', 'playwright.config.ts', 'e2e/**/*.ts'],
+    files: ['src/**/*.{ts,tsx}', 'api/**/*.ts', 'vite.config.ts', 'drizzle.config.ts', 'playwright.config.ts', 'e2e/**/*.ts'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {

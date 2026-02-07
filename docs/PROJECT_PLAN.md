@@ -3,6 +3,8 @@
 
 > **📊 V1 Status: COMPLETE + V1.1 HARDENING ACTIVE** — All P0/P1 features implemented. PR quality gate, mobile E2E smoke, mobile UX polish, split-chunk build, and risk guardrails are now implemented in frontend scope.
 >
+> **🧩 V2 Status: BACKEND FOUNDATION ADDED (VERCEL)** — `/api/v2` auth, domain state endpoints, migration endpoint, cron maintenance endpoint, Drizzle schema, and backend feature-flag rollout are implemented.
+>
 > **🚀 Deployment Hardening Added:** Vercel security headers, live mobile smoke workflow, uptime monitor workflow, analytics/speed-insights integration, and branch-protection automation script are now in place. See `docs/DEPLOYMENT_HARDENING.md`.
 
 ---

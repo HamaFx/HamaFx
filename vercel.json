@@ -1,5 +1,28 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "api/v2/health.ts": {
+      "maxDuration": 10
+    },
+    "api/v2/cron/maintenance.ts": {
+      "maxDuration": 30
+    },
+    "api/v2/market/*.ts": {
+      "maxDuration": 15
+    },
+    "api/v2/news.ts": {
+      "maxDuration": 15
+    },
+    "api/v2/**/*.ts": {
+      "maxDuration": 10
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/v2/cron/maintenance",
+      "schedule": "0 3 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

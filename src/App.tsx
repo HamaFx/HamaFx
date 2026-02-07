@@ -8,6 +8,7 @@ import { usePortfolioStore } from '@/stores/portfolioStore';
 import { useWatchlistStore } from '@/stores/watchlistStore';
 import { useAlertStore } from '@/stores/alertStore';
 import { useChatStore } from '@/stores/chatStore';
+import { startBackendSyncSubscriptions, pullBackendState, shouldPullRemoteState, shouldPushRemoteState } from '@/services/backend/stateSync';
 
 // Pages
 const Dashboard = lazy(() => import('@/pages/Dashboard'));
@@ -86,10 +87,27 @@ export function App() {
     loadUserSettings();
     loadMessages();
     if (!isAuthenticated) return;
+
+    if (shouldPullRemoteState()) {
+      void pullBackendState().catch(() => {
+        // Fall back to local state if backend sync is unavailable.
+        loadPortfolio();
+        loadWatchlists();
+        loadAlerts();
+      });
+      return;
+    }
+
     loadPortfolio();
     loadWatchlists();
     loadAlerts();
   }, [isAuthenticated, loadUserSettings, loadMessages, loadPortfolio, loadWatchlists, loadAlerts]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !shouldPushRemoteState()) return;
+    const stop = startBackendSyncSubscriptions();
+    return stop;
+  }, [isAuthenticated]);
 
   return (
     <HashRouter>

@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import type { User, AuditEntry, AuditAction } from '@/types';
 import { getItemWithMigration } from '@/utils/storageMigration';
+import { apiLogin, apiLogout, apiMe, apiRegister } from '@/services/backend/authApi';
+import { isBackendEnabled, isBackendOn } from '@/services/backend/config';
 
 function generateId(): string {
   return crypto.randomUUID?.() || Math.random().toString(36).substring(2) + Date.now().toString(36);
@@ -88,6 +90,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   auditLog: getAuditLog(),
 
   register: async (email, password, username) => {
+    if (isBackendEnabled()) {
+      try {
+        const result = await apiRegister(email, password, username);
+        localStorage.setItem(SESSION_KEY, JSON.stringify(result.user));
+        set({ user: result.user, isAuthenticated: true });
+        get().addAuditEntry('REGISTER', `User ${result.user.username} registered (backend)`);
+        return { success: true };
+      } catch (error) {
+        if (isBackendOn()) {
+          const message = error instanceof Error ? error.message : 'Backend registration failed';
+          return { success: false, error: message };
+        }
+      }
+    }
+
     try {
       const users = getUsers();
       if (users.find(u => u.email === email)) {
@@ -126,6 +143,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   login: async (email, password) => {
+    if (isBackendEnabled()) {
+      try {
+        const result = await apiLogin(email, password);
+        localStorage.setItem(SESSION_KEY, JSON.stringify(result.user));
+        set({ user: result.user, isAuthenticated: true });
+        get().addAuditEntry('LOGIN', `User ${result.user.username} logged in (backend)`);
+        return { success: true };
+      } catch (error) {
+        if (isBackendOn()) {
+          const message = error instanceof Error ? error.message : 'Backend login failed';
+          return { success: false, error: message };
+        }
+      }
+    }
+
     try {
       const users = getUsers();
       const user = users.find(u => u.email === email);
@@ -145,6 +177,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: () => {
+    if (isBackendEnabled()) {
+      void apiLogout();
+    }
     get().addAuditEntry('LOGOUT', 'User logged out');
     localStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(LEGACY_SESSION_KEY);
@@ -152,6 +187,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   restoreSession: () => {
+    if (isBackendEnabled()) {
+      const stored = getItemWithMigration(SESSION_KEY, [LEGACY_SESSION_KEY]);
+      if (stored) {
+        try {
+          const cachedUser = JSON.parse(stored) as User;
+          set({ user: cachedUser, isAuthenticated: true });
+        } catch {
+          // Ignore parse errors and continue with live check.
+        }
+      }
+
+      void (async () => {
+        try {
+          const user = await apiMe();
+          localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+          set({ user, isAuthenticated: true });
+        } catch {
+          if (isBackendOn()) {
+            localStorage.removeItem(SESSION_KEY);
+            localStorage.removeItem(LEGACY_SESSION_KEY);
+            set({ user: null, isAuthenticated: false });
+          }
+        }
+      })();
+      return;
+    }
+
     try {
       const stored = getItemWithMigration(SESSION_KEY, [LEGACY_SESSION_KEY]);
       if (stored) {

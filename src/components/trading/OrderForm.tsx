@@ -5,6 +5,8 @@ import { usePortfolioStore } from '@/stores/portfolioStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { isGeminiAvailable } from '@/services/gemini';
 import { evaluateOrderRisk, formatGuardrailError } from '@/services/riskGuardrails';
+import { isBackendOn } from '@/services/backend/config';
+import { apiFetchPortfolio, apiPlaceOrder } from '@/services/backend/tradingApi';
 import toast from 'react-hot-toast';
 import type { OrderSide, OrderType, AssetType, TradeEvalResult } from '@/types';
 
@@ -100,7 +102,7 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (calcQuantity <= 0) {
       amountInputRef.current?.focus();
       return;
@@ -131,19 +133,59 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
       return;
     }
 
-    const result = placeOrder({
-      symbol,
-      name,
-      assetType,
-      side,
-      type: orderType,
-      quantity: calcQuantity,
-      price: effectivePrice,
-      stopLoss: stopLoss ? parseFloat(stopLoss) : undefined,
-      takeProfit: takeProfit ? parseFloat(takeProfit) : undefined,
-    });
+    try {
+      if (isBackendOn()) {
+        const response = await apiPlaceOrder({
+          symbol,
+          name,
+          assetType,
+          side,
+          type: orderType,
+          quantity: calcQuantity,
+          price: effectivePrice,
+          stopLoss: stopLoss ? parseFloat(stopLoss) : undefined,
+          takeProfit: takeProfit ? parseFloat(takeProfit) : undefined,
+        });
 
-    if (result.success) {
+        const snapshot = await apiFetchPortfolio();
+        usePortfolioStore.setState({
+          virtualBalance: snapshot.virtualBalance,
+          totalDeposited: snapshot.totalDeposited,
+          positions: snapshot.positions as never,
+          orders: snapshot.orders as never,
+          tradeHistory: snapshot.tradeHistory as never,
+          balanceHistory: snapshot.balanceHistory as never,
+        });
+
+        const warnings = response.warnings ?? [];
+        if (warnings.length > 0) {
+          toast((t) => (
+            <div className="text-xs">
+              <p className="font-semibold mb-1">Risk warning</p>
+              <p>{warnings.join(' ')}</p>
+              <button className="mt-2 underline" onClick={() => toast.dismiss(t.id)}>Dismiss</button>
+            </div>
+          ), { duration: 5000 });
+        }
+      } else {
+        const result = placeOrder({
+          symbol,
+          name,
+          assetType,
+          side,
+          type: orderType,
+          quantity: calcQuantity,
+          price: effectivePrice,
+          stopLoss: stopLoss ? parseFloat(stopLoss) : undefined,
+          takeProfit: takeProfit ? parseFloat(takeProfit) : undefined,
+        });
+
+        if (!result.success) {
+          toast.error(result.error || 'Trade failed');
+          return;
+        }
+      }
+
       toast.success(
         `${side === 'buy' ? '🟢' : '🔴'} ${side.toUpperCase()} ${calcQuantity.toFixed(assetType === 'crypto' ? 6 : 2)} ${symbol} @ $${effectivePrice.toFixed(2)}`,
         { duration: 4000 }
@@ -152,8 +194,8 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
       setQuantity('');
       setShowConfirm(false);
       onTradeComplete?.();
-    } else {
-      toast.error(result.error || 'Trade failed');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Trade failed');
     }
   };
 

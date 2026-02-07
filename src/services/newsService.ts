@@ -8,6 +8,8 @@ import { cacheService } from '@/services/cache';
 import { rateLimiter } from '@/services/rateLimiter';
 import { getCuratedNews } from '@/data/curatedNews';
 import { keywordSentiment } from '@/services/gemini';
+import { isBackendEnabled } from '@/services/backend/config';
+import { backendFetch } from '@/services/backend/http';
 
 const NEWSDATA_URL = 'https://newsdata.io/api/1/news';
 
@@ -19,6 +21,21 @@ export async function fetchNews(category?: string): Promise<{ articles: NewsArti
   const cacheKey = `news_${category || 'all'}`;
   const cached = cacheService.get<{ articles: NewsArticle[]; source: 'newsdata' | 'curated' }>(cacheKey);
   if (cached) return cached;
+
+  if (isBackendEnabled()) {
+    try {
+      const requested = category && category !== 'all' ? category : 'all';
+      const articles = await backendFetch<NewsArticle[]>(`/api/v2/news?category=${encodeURIComponent(requested)}`);
+      const source: 'newsdata' | 'curated' = articles.some((item) => item.source === 'Hama Fx Curated')
+        ? 'curated'
+        : 'newsdata';
+      const result = { articles, source };
+      cacheService.set(cacheKey, result, 120_000);
+      return result;
+    } catch (err) {
+      console.warn('[News] Backend news fetch failed:', err);
+    }
+  }
 
   const apiKey = getNewsApiKey();
 

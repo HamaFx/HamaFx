@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const isCI = !!process.env.CI;
 const liveBaseUrl = process.env.PLAYWRIGHT_BASE_URL;
+const protectionBypass = process.env.PLAYWRIGHT_PROTECTION_BYPASS;
 const localBrowser = process.env.PW_BROWSER ?? 'chromium';
 const browserName = (isCI ? 'webkit' : localBrowser) as 'chromium' | 'webkit' | 'firefox';
 const projectName = browserName === 'webkit' ? 'mobile-safari' : `mobile-${browserName}`;
@@ -23,6 +24,9 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
+    extraHTTPHeaders: protectionBypass
+      ? { 'x-vercel-protection-bypass': protectionBypass }
+      : undefined,
   },
   webServer: liveBaseUrl
     ? undefined
