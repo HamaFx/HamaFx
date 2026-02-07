@@ -1,4 +1,4 @@
-import { withRedisCache } from './redis';
+import { withRedisCache } from './redis.js';
 
 const COINGECKO_BASE = 'https://api.coingecko.com/api/v3';
 const COINCAP_BASE = 'https://api.coincap.io/v2';

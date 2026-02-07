@@ -1,5 +1,5 @@
-import { corsHeaders, optionsResponse } from './http';
-import { getEnv } from './env';
+import { corsHeaders, optionsResponse } from './http.js';
+import { getEnv } from './env.js';
 
 export function withCors(response: Response, request: Request): Response {
   let allowedOrigin = '*';

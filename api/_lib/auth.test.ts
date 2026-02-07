@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createAccessToken, hashPassword, verifyAccessToken, verifyPassword } from './auth';
+import { createAccessToken, hashPassword, verifyAccessToken, verifyPassword } from './auth.js';
 
 describe('api auth utils', () => {
   it('hashes and verifies passwords', () => {

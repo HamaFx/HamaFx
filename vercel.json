@@ -1,22 +1,75 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
-    "api/v2/health.ts": {
-      "maxDuration": 10
-    },
     "api/v2/cron/maintenance.ts": {
       "maxDuration": 30
     },
-    "api/v2/market/*.ts": {
-      "maxDuration": 15
-    },
-    "api/v2/news.ts": {
-      "maxDuration": 15
-    },
     "api/v2/**/*.ts": {
-      "maxDuration": 10
+      "maxDuration": 15
     }
   },
+  "rewrites": [
+    {
+      "source": "/api/v2/portfolio",
+      "destination": "/api/v2/trading/portfolio"
+    },
+    {
+      "source": "/api/v2/orders",
+      "destination": "/api/v2/trading/orders"
+    },
+    {
+      "source": "/api/v2/orders/:id",
+      "destination": "/api/v2/trading/orders?id=:id"
+    },
+    {
+      "source": "/api/v2/trades",
+      "destination": "/api/v2/trading/trades"
+    },
+    {
+      "source": "/api/v2/positions/:id/close",
+      "destination": "/api/v2/trading/close-position?id=:id"
+    },
+    {
+      "source": "/api/v2/watchlists",
+      "destination": "/api/v2/data/watchlists"
+    },
+    {
+      "source": "/api/v2/watchlists/:id",
+      "destination": "/api/v2/data/watchlists?id=:id"
+    },
+    {
+      "source": "/api/v2/alerts",
+      "destination": "/api/v2/data/alerts"
+    },
+    {
+      "source": "/api/v2/alerts/:id",
+      "destination": "/api/v2/data/alerts?id=:id"
+    },
+    {
+      "source": "/api/v2/settings",
+      "destination": "/api/v2/data/settings"
+    },
+    {
+      "source": "/api/v2/state",
+      "destination": "/api/v2/data/state"
+    },
+    {
+      "source": "/api/v2/chat",
+      "destination": "/api/v2/data/chat"
+    },
+    {
+      "source": "/api/v2/audit",
+      "destination": "/api/v2/data/audit"
+    },
+    {
+      "source": "/api/v2/news",
+      "destination": "/api/v2/data/news"
+    },
+    {
+      "source": "/api/v2/migrate/import",
+      "destination": "/api/v2/data/migrate-import"
+    }
+  ],
   "crons": [
     {
       "path": "/api/v2/cron/maintenance",

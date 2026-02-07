@@ -1,4 +1,4 @@
-import { evaluateOrderRisk, formatGuardrailError } from './risk';
+import { evaluateOrderRisk, formatGuardrailError } from './risk.js';
 
 type AssetType = 'crypto' | 'forex';
 type OrderSide = 'buy' | 'sell';

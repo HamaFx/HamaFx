@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { and, eq, isNull } from 'drizzle-orm';
-import { getDb, schema } from './db/client';
-import { getEnv } from './env';
+import { getDb, schema } from './db/client.js';
+import { getEnv } from './env.js';
 
 const ACCESS_TTL_SECONDS = 60 * 15;
 const REFRESH_TTL_SECONDS = 60 * 60 * 24 * 14;

@@ -1,5 +1,5 @@
-import { fail } from './http';
-import { withCors } from './request';
+import { fail } from './http.js';
+import { withCors } from './request.js';
 
 export async function handleApi(
   request: Request,

@@ -1,5 +1,5 @@
 import { asc, desc, eq } from 'drizzle-orm';
-import { getDb, schema } from './db/client';
+import { getDb, schema } from './db/client.js';
 
 type AnyRecord = Record<string, unknown>;
 type PortfolioSnapshot = {

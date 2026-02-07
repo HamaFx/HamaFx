@@ -1,5 +1,5 @@
-import { getEnv } from './env';
-import { withRedisCache } from './redis';
+import { getEnv } from './env.js';
+import { withRedisCache } from './redis.js';
 
 function hoursAgo(hours: number): string {
   return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();

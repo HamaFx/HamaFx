@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { getEnv } from '../env';
-import * as schema from './schema';
+import { getEnv } from '../env.js';
+import * as schema from './schema.js';
 
 let cachedClient: ReturnType<typeof postgres> | null = null;
 let cachedDb: ReturnType<typeof drizzle<typeof schema>> | null = null;
