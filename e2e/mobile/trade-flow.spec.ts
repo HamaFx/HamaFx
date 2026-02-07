@@ -16,6 +16,7 @@ test.describe('Mobile Trade Flow', () => {
 
     await page.goto('/#/portfolio');
     await expect(page.getByRole('button', { name: /Positions/i })).toBeVisible();
-    await expect(page.getByText('BTC')).toBeVisible();
+    await expect(page.getByRole('button', { name: /BTC\s+long/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Close$/ }).first()).toBeVisible();
   });
 });

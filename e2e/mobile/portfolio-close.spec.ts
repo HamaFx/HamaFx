@@ -17,7 +17,7 @@ test.describe('Mobile Portfolio Close', () => {
 
     await createPosition(page);
     await page.goto('/#/portfolio');
-    await expect(page.getByText('BTC')).toBeVisible();
+    await expect(page.getByRole('button', { name: /BTC\s+long/i }).first()).toBeVisible();
 
     await page.getByRole('button', { name: /^Close$/ }).first().click();
     await expect(page.getByText('No open positions')).toBeVisible();

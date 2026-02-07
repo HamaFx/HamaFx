@@ -5,10 +5,15 @@ export async function gotoLogin(page: Page): Promise<void> {
   await expect(page.getByRole('button', { name: /Try Demo Account/i })).toBeVisible();
 }
 
+export async function expectDashboardLoaded(page: Page): Promise<void> {
+  await expect(page).toHaveURL(/#\/$/);
+  await expect(page.getByText('Portfolio Value')).toBeVisible();
+}
+
 export async function loginWithDemo(page: Page): Promise<void> {
   await gotoLogin(page);
   await page.getByRole('button', { name: /Try Demo Account/i }).click();
-  await expect(page).toHaveURL(/#\/$/);
+  await expectDashboardLoaded(page);
 }
 
 export async function logoutFromMobileMenu(page: Page): Promise<void> {
@@ -28,7 +33,7 @@ export async function registerViaForm(
   await page.getByPlaceholder('Email').fill(creds.email);
   await page.getByPlaceholder('Password').fill(creds.password);
   await page.getByRole('button', { name: /Create Account/i }).click();
-  await expect(page).toHaveURL(/#\/$/);
+  await expectDashboardLoaded(page);
 }
 
 export async function loginViaForm(
@@ -39,5 +44,5 @@ export async function loginViaForm(
   await page.getByPlaceholder('Email').fill(creds.email);
   await page.getByPlaceholder('Password').fill(creds.password);
   await page.getByRole('button', { name: /Sign In/i }).click();
-  await expect(page).toHaveURL(/#\/$/);
+  await expectDashboardLoaded(page);
 }

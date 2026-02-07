@@ -1,6 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const isCI = !!process.env.CI;
+const localBrowser = process.env.PW_BROWSER ?? 'chromium';
+const browserName = (isCI ? 'webkit' : localBrowser) as 'chromium' | 'webkit' | 'firefox';
+const projectName = browserName === 'webkit' ? 'mobile-safari' : `mobile-${browserName}`;
 
 export default defineConfig({
   testDir: './e2e/mobile',
@@ -28,10 +31,10 @@ export default defineConfig({
   },
   projects: [
     {
-      name: 'mobile-safari',
+      name: projectName,
       use: {
         ...devices['iPhone 13'],
-        browserName: 'webkit',
+        browserName,
       },
     },
   ],
