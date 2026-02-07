@@ -3,7 +3,10 @@ import { useMarketStore } from '@/stores/marketStore';
 import { useWatchlistStore } from '@/stores/watchlistStore';
 import { useAlertStore } from '@/stores/alertStore';
 import { useSettingsStore } from '@/stores/settingsStore';
+import type { ChatAssistantResponse } from '@/types';
 import type { ChatMessage } from '@/stores/chatStore';
+import { isBackendEnabled } from '@/services/backend/config';
+import { apiAiChat } from '@/services/backend/aiApi';
 
 function buildPortfolioContext(): string {
   const { positions, virtualBalance, tradeHistory, getTotalValue } = usePortfolioStore.getState();
@@ -11,7 +14,7 @@ function buildPortfolioContext(): string {
     return `Portfolio: $${virtualBalance.toLocaleString()} cash, no open positions, no trade history.`;
   }
 
-  const positionSummary = positions.map(p => {
+  const positionSummary = positions.map((p) => {
     const pnl = p.side === 'long'
       ? (p.currentPrice - p.entryPrice) * p.quantity
       : (p.entryPrice - p.currentPrice) * p.quantity;
@@ -21,49 +24,40 @@ function buildPortfolioContext(): string {
 
   const totalValue = getTotalValue();
   const winRate = tradeHistory.length > 0
-    ? `${((tradeHistory.filter(t => (t.pnl || 0) > 0).length / tradeHistory.length) * 100).toFixed(0)}%`
+    ? `${((tradeHistory.filter((t) => (t.pnl || 0) > 0).length / tradeHistory.length) * 100).toFixed(0)}%`
     : 'N/A';
 
-  return `Portfolio Summary:
-- Total Value: $${totalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-- Cash: $${virtualBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-- Open Positions (${positions.length}):
-${positionSummary || '  None'}
-- Total Trades: ${tradeHistory.length}, Win Rate: ${winRate}`;
+  return `Portfolio Summary:\n- Total Value: $${totalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}\n- Cash: $${virtualBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}\n- Open Positions (${positions.length}):\n${positionSummary || '  None'}\n- Total Trades: ${tradeHistory.length}, Win Rate: ${winRate}`;
 }
 
 function buildMarketContext(): string {
   const { cryptoAssets, forexPairs } = useMarketStore.getState();
   const top5 = cryptoAssets.slice(0, 5);
-  
-  const cryptoLines = top5.map(a => 
+
+  const cryptoLines = top5.map((a) =>
     `- ${a.symbol.toUpperCase()}: $${a.price.toLocaleString(undefined, { maximumFractionDigits: 2 })} (${a.changePercent24h >= 0 ? '+' : ''}${a.changePercent24h.toFixed(1)}%)`
   ).join('\n');
 
-  const forexLines = forexPairs.slice(0, 4).map(f =>
+  const forexLines = forexPairs.slice(0, 4).map((f) =>
     `- ${f.symbol}: ${f.rate.toFixed(4)} (${f.changePercent24h >= 0 ? '+' : ''}${f.changePercent24h.toFixed(2)}%)`
   ).join('\n');
 
-  return `Market Overview:
-Crypto:
-${cryptoLines}
-Forex:
-${forexLines}`;
+  return `Market Overview:\nCrypto:\n${cryptoLines}\nForex:\n${forexLines}`;
 }
 
 function buildWatchlistContext(): string {
   const { watchlists } = useWatchlistStore.getState();
-  const allSymbols = watchlists.flatMap(w => w.symbols.map(s => s.symbol));
+  const allSymbols = watchlists.flatMap((w) => w.symbols.map((s) => s.symbol));
   if (allSymbols.length === 0) return 'Watchlist: Empty';
   return `Watchlist assets: ${[...new Set(allSymbols)].join(', ')}`;
 }
 
 function buildAlertContext(): string {
   const { alerts } = useAlertStore.getState();
-  const active = alerts.filter(a => a.isActive && !a.isTriggered);
-  const triggered = alerts.filter(a => a.isTriggered);
+  const active = alerts.filter((a) => a.isActive && !a.isTriggered);
+  const triggered = alerts.filter((a) => a.isTriggered);
   if (alerts.length === 0) return 'Alerts: None configured';
-  return `Alerts: ${active.length} active, ${triggered.length} triggered. Active: ${active.map(a => `${a.symbol} ${a.type} ${a.targetValue}`).join('; ')}`;
+  return `Alerts: ${active.length} active, ${triggered.length} triggered. Active: ${active.map((a) => `${a.symbol} ${a.type} ${a.targetValue}`).join('; ')}`;
 }
 
 function buildFullContext(): string {
@@ -92,19 +86,38 @@ DISCLAIMER: All analysis is for educational purposes only. Past performance does
 export async function sendChatMessage(
   userMessage: string,
   chatHistory: ChatMessage[]
-): Promise<string> {
-  const apiKey = useSettingsStore.getState().getGeminiKey();
+): Promise<ChatAssistantResponse> {
+  if (isBackendEnabled()) {
+    try {
+      const historyPayload = chatHistory
+        .filter((message) => message.role === 'user' || message.role === 'assistant')
+        .slice(-10)
+        .map((message) => ({ role: message.role as 'user' | 'assistant', content: message.content }));
 
+      const backend = await apiAiChat({
+        message: userMessage,
+        history: historyPayload,
+      });
+
+      return {
+        ...backend,
+        source: backend.source === 'gemini' || backend.source === 'rule-based' ? backend.source : 'backend',
+      };
+    } catch (error) {
+      console.warn('[Chat] Backend chat failed, trying direct Gemini/local fallback:', error);
+    }
+  }
+
+  const apiKey = useSettingsStore.getState().getGeminiKey();
   if (!apiKey) {
     return generateLocalResponse(userMessage);
   }
 
   const context = buildFullContext();
-  
-  // Build conversation history (last 10 messages for context window)
-  const recentHistory = chatHistory.slice(-10).map(m => ({
-    role: m.role === 'assistant' ? 'model' as const : 'user' as const,
-    parts: [{ text: m.content }],
+
+  const recentHistory = chatHistory.slice(-10).map((message) => ({
+    role: message.role === 'assistant' ? 'model' as const : 'user' as const,
+    parts: [{ text: message.content }],
   }));
 
   const contents = [
@@ -124,7 +137,7 @@ export async function sendChatMessage(
   ];
 
   try {
-    const res = await fetch(
+    const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       {
         method: 'POST',
@@ -140,44 +153,93 @@ export async function sendChatMessage(
       }
     );
 
-    if (!res.ok) {
-      if (res.status === 429) return '⚠️ Rate limit reached. Please wait a moment and try again.';
-      if (res.status === 401 || res.status === 403) return '⚠️ Invalid API key. Please check your Gemini API key in Settings.';
-      throw new Error(`API error: ${res.status}`);
+    if (!response.ok) {
+      if (response.status === 429) {
+        return {
+          reply: '⚠️ Rate limit reached. Please wait a moment and try again.',
+          followUps: ['Try again in a moment', 'Review my portfolio risk'],
+          riskLevel: 'medium',
+          generatedAt: new Date().toISOString(),
+          source: 'rule-based',
+        };
+      }
+      if (response.status === 401 || response.status === 403) {
+        return {
+          reply: '⚠️ Invalid API key. Please check your Gemini API key in Settings.',
+          followUps: ['Open Settings', 'Use local AI mode for now'],
+          riskLevel: 'medium',
+          generatedAt: new Date().toISOString(),
+          source: 'rule-based',
+        };
+      }
+      throw new Error(`API error: ${response.status}`);
     }
 
-    const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    const data = await response.json();
+    const text = (data as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> })?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) throw new Error('Empty response');
-    return text;
-  } catch (e) {
-    console.error('Chat API error:', e);
+
+    return {
+      reply: text,
+      followUps: [],
+      riskLevel: 'medium',
+      generatedAt: new Date().toISOString(),
+      source: 'gemini',
+    };
+  } catch (error) {
+    console.error('Chat API error:', error);
     return generateLocalResponse(userMessage);
   }
 }
 
-function generateLocalResponse(message: string): string {
+function generateLocalResponse(message: string): ChatAssistantResponse {
   const lower = message.toLowerCase();
 
   if (lower.includes('portfolio') || lower.includes('position') || lower.includes('balance')) {
-    return `📊 Here's your current status:\n\n${buildPortfolioContext()}\n\n💡 *Tip: Add a Gemini API key in Settings for detailed AI analysis.*`;
+    return {
+      reply: `📊 Here's your current status:\n\n${buildPortfolioContext()}\n\n💡 Tip: Enable backend AI mode for deeper strategy guidance and proactive recommendations.`,
+      followUps: ['What is my biggest portfolio risk?', 'How should I rebalance?', 'Show my recent performance'],
+      riskLevel: 'medium',
+      generatedAt: new Date().toISOString(),
+      source: 'rule-based',
+    };
   }
 
   if (lower.includes('market') || lower.includes('price') || lower.includes('bitcoin') || lower.includes('btc') || lower.includes('eth')) {
-    return `📈 Current market snapshot:\n\n${buildMarketContext()}\n\n💡 *Add a Gemini API key for in-depth market analysis.*`;
+    return {
+      reply: `📈 Current market snapshot:\n\n${buildMarketContext()}\n\n💡 Enable backend AI for narrative-aware market intelligence and opportunity ranking.`,
+      followUps: ['Give me top opportunities', 'Summarize risk-on vs risk-off', 'Which assets are overextended?'],
+      riskLevel: 'medium',
+      generatedAt: new Date().toISOString(),
+      source: 'rule-based',
+    };
   }
 
   if (lower.includes('watchlist')) {
-    return `👀 ${buildWatchlistContext()}\n\n💡 *Add a Gemini API key for watchlist analysis.*`;
+    return {
+      reply: `👀 ${buildWatchlistContext()}\n\n💡 Backend AI can score your watchlist by momentum and risk profile.`,
+      followUps: ['Rank my watchlist', 'Find the highest-risk symbol', 'Suggest alert levels'],
+      riskLevel: 'low',
+      generatedAt: new Date().toISOString(),
+      source: 'rule-based',
+    };
   }
 
   if (lower.includes('alert')) {
-    return `🔔 ${buildAlertContext()}\n\n💡 *Add a Gemini API key for smart alert suggestions.*`;
+    return {
+      reply: `🔔 ${buildAlertContext()}\n\n💡 Backend AI can suggest smarter alert thresholds based on volatility.`,
+      followUps: ['Suggest new alert levels', 'Show triggered alerts context', 'What alerts am I missing?'],
+      riskLevel: 'low',
+      generatedAt: new Date().toISOString(),
+      source: 'rule-based',
+    };
   }
 
-  if (lower.includes('help') || lower.includes('what can you do')) {
-    return `🤖 **HamaFX AI Assistant**\n\nI can help with:\n• 📊 Portfolio analysis & risk assessment\n• 📈 Market analysis & price insights\n• 💡 Trade ideas & strategy discussion\n• 🔔 Alert & watchlist suggestions\n• 📚 Trading concepts & education\n\n⚡ *For full AI capabilities, add your free Gemini API key in Settings → API Keys.*`;
-  }
-
-  return `I can help with portfolio analysis, market insights, and trading questions.\n\n${buildPortfolioContext()}\n\n${buildMarketContext()}\n\n💡 *For detailed AI responses, add a free Gemini API key in Settings → API Keys.*`;
+  return {
+    reply: `I can help with portfolio analysis, market context, and trade planning.\n\n${buildPortfolioContext()}\n\n${buildMarketContext()}\n\nEnable backend AI mode for full copilot intelligence.`,
+    followUps: ['Analyze my risk exposure', 'Find top opportunities now', 'Build me a trade plan template'],
+    riskLevel: 'medium',
+    generatedAt: new Date().toISOString(),
+    source: 'rule-based',
+  };
 }

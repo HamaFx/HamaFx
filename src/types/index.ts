@@ -171,7 +171,48 @@ export interface TradeEvalResult {
   diversificationImpact: string;
   suggestions: string[];
   warning?: string;
+  source?: 'gemini' | 'rule-based' | 'backend';
+  generatedAt?: string;
 }
+
+export interface AiOpportunity {
+  symbol: string;
+  bias: 'bullish' | 'bearish' | 'neutral';
+  confidence: number;
+  reason: string;
+}
+
+export interface AiDashboardInsights {
+  summary: string;
+  marketMood: 'risk-on' | 'risk-off' | 'mixed' | 'uncertain';
+  keyDrivers: string[];
+  portfolioActions: string[];
+  riskFlags: string[];
+  opportunities: AiOpportunity[];
+  source: 'gemini' | 'rule-based' | 'backend';
+  generatedAt: string;
+}
+
+export interface AiNewsBrief {
+  headline: string;
+  summary: string;
+  themes: string[];
+  actionableIdeas: AiOpportunity[];
+  riskLevel: 'low' | 'medium' | 'high';
+  sentimentScore: number;
+  source: 'gemini' | 'keyword' | 'backend';
+  generatedAt: string;
+}
+
+export interface ChatAssistantResponse {
+  reply: string;
+  followUps: string[];
+  riskLevel: 'low' | 'medium' | 'high';
+  source: 'gemini' | 'rule-based' | 'backend';
+  generatedAt: string;
+}
+
+export type AiSentimentResult = SentimentResult;
 
 // ===== News Types =====
 

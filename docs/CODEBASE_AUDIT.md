@@ -196,3 +196,28 @@ Date: February 7, 2026
 - `docs/V1_BACKUP_RESTORE.md`
 - Added backend setup runbook:
 - `docs/V2_BACKEND_SETUP.md`
+
+## 12) V2 AI System Upgrade (Backend-Driven)
+- Added unified backend AI orchestration library:
+- `api/_lib/ai.ts`
+- Added authenticated AI endpoints:
+- `POST /api/v2/ai/chat`
+- `GET /api/v2/ai/insights`
+- `POST /api/v2/ai/analysis`
+- `POST /api/v2/ai/sentiment`
+- `POST /api/v2/ai/trade-eval`
+- `GET /api/v2/ai/news-brief`
+- Added frontend backend AI client:
+- `src/services/backend/aiApi.ts`
+- Updated AI service layer to backend-first with graceful fallback:
+- `src/services/gemini.ts`
+- Updated chat flow to structured responses (follow-ups + risk level):
+- `src/services/chatService.ts`
+- `src/stores/chatStore.ts`
+- `src/components/AIChatDrawer.tsx`
+- Upgraded AI-driven UX surfaces:
+- `src/pages/Dashboard.tsx` now uses backend AI insights.
+- `src/pages/News.tsx` now includes AI news brief card.
+- `src/components/layout/Layout.tsx` and `src/pages/Settings.tsx` now reflect backend AI-connected status.
+- Added new backend AI environment variable documentation:
+- `GEMINI_API_KEY` in `.env.example` and `docs/V2_BACKEND_SETUP.md`.

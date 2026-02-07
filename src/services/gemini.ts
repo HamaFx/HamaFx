@@ -1,11 +1,25 @@
-// Google Gemini AI Service — Market analysis, sentiment, trade evaluation
-// Uses user-provided API key from Settings
-// Falls back to rule-based engine when key is not available
+// AI Service layer for market analysis, sentiment, insights, and trade evaluation.
+// Backend-first when V2 backend mode is enabled, with local Gemini + rule fallback.
 
-import type { AiAnalysisResult, SentimentResult, MarketSummary } from '@/types';
+import type {
+  AiAnalysisResult,
+  AiDashboardInsights,
+  AiNewsBrief,
+  MarketSummary,
+  SentimentResult,
+  TradeEvalResult,
+} from '@/types';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { cacheService } from '@/services/cache';
 import { rateLimiter } from '@/services/rateLimiter';
+import { isBackendEnabled } from '@/services/backend/config';
+import {
+  apiAiAssetAnalysis,
+  apiAiInsights,
+  apiAiNewsBrief,
+  apiAiSentiment,
+  apiAiTradeEval,
+} from '@/services/backend/aiApi';
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
@@ -45,21 +59,83 @@ async function callGemini(prompt: string, systemPrompt: string): Promise<string>
     const errorData = await response.json().catch(() => ({}));
     if (response.status === 429) throw new Error('RATE_LIMITED');
     if (response.status === 403) throw new Error('INVALID_KEY');
-    throw new Error(errorData?.error?.message || `Gemini API error: ${response.status}`);
+    throw new Error((errorData as { error?: { message?: string } })?.error?.message || `Gemini API error: ${response.status}`);
   }
 
   const data = await response.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+  const text = (data as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> })?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error('Empty response from Gemini');
 
   return text;
 }
 
 function parseJSON<T>(text: string): T {
-  // Extract JSON from markdown code blocks if present
   const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   const jsonStr = jsonMatch ? jsonMatch[1].trim() : text.trim();
-  return JSON.parse(jsonStr);
+  return JSON.parse(jsonStr) as T;
+}
+
+// ===== Dashboard Intelligence =====
+export async function getDashboardInsights(): Promise<AiDashboardInsights> {
+  const cacheKey = 'ai_dashboard_insights';
+  const cached = cacheService.get<AiDashboardInsights>(cacheKey);
+  if (cached) return cached;
+
+  if (isBackendEnabled()) {
+    try {
+      const response = await apiAiInsights();
+      const normalized: AiDashboardInsights = {
+        ...response,
+        source: response.source === 'gemini' || response.source === 'rule-based' ? response.source : 'backend',
+      };
+      cacheService.set(cacheKey, normalized, 90_000);
+      return normalized;
+    } catch (error) {
+      console.warn('[AI] Backend insights failed, using local fallback:', error);
+    }
+  }
+
+  return {
+    summary: 'AI backend is unavailable. Using local market heuristics until connectivity is restored.',
+    marketMood: 'mixed',
+    keyDrivers: ['Backend insight endpoint unavailable.'],
+    portfolioActions: ['Review active positions and keep risk per trade bounded.'],
+    riskFlags: [],
+    opportunities: [],
+    source: 'rule-based',
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+export async function getNewsBrief(category: 'all' | 'crypto' | 'forex' | 'economy' | 'general' = 'all'): Promise<AiNewsBrief> {
+  const cacheKey = `ai_news_brief_${category}`;
+  const cached = cacheService.get<AiNewsBrief>(cacheKey);
+  if (cached) return cached;
+
+  if (isBackendEnabled()) {
+    try {
+      const response = await apiAiNewsBrief({ category, limit: 16 });
+      const normalized: AiNewsBrief = {
+        ...response,
+        source: response.source === 'gemini' || response.source === 'keyword' ? response.source : 'backend',
+      };
+      cacheService.set(cacheKey, normalized, 120_000);
+      return normalized;
+    } catch (error) {
+      console.warn('[AI] Backend news brief failed, using local fallback:', error);
+    }
+  }
+
+  return {
+    headline: 'News brief is warming up',
+    summary: 'AI news digest requires backend mode. Enable backend to get narrative clustering and opportunity extraction.',
+    themes: ['Backend AI required'],
+    actionableIdeas: [],
+    riskLevel: 'medium',
+    sentimentScore: 0,
+    source: 'keyword',
+    generatedAt: new Date().toISOString(),
+  };
 }
 
 // ===== Market Analysis =====
@@ -71,6 +147,20 @@ export async function getMarketAnalysis(
   const cacheKey = `ai_analysis_${assetSymbol}`;
   const cached = cacheService.get<AiAnalysisResult>(cacheKey);
   if (cached) return cached;
+
+  if (isBackendEnabled()) {
+    try {
+      const response = await apiAiAssetAnalysis({ assetName, assetSymbol, context });
+      const normalized: AiAnalysisResult = {
+        ...response,
+        source: response.source === 'gemini' ? 'gemini' : 'rule-based',
+      };
+      cacheService.set(cacheKey, normalized, 180_000);
+      return normalized;
+    } catch (error) {
+      console.warn('[AI] Backend market analysis failed, trying local Gemini:', error);
+    }
+  }
 
   const systemPrompt = `You are a professional financial market analyst. Analyze the provided market data and generate a structured trading analysis. You MUST respond with valid JSON only, no markdown, no explanation outside the JSON.
 
@@ -90,11 +180,7 @@ Respond with this exact JSON structure:
   "summary": "<1-2 sentence summary>"
 }`;
 
-  const prompt = `Analyze ${assetName} (${assetSymbol}) with the following market data:
-
-${JSON.stringify(context, null, 2)}
-
-Provide a comprehensive trading analysis.`;
+  const prompt = `Analyze ${assetName} (${assetSymbol}) with the following market data:\n\n${JSON.stringify(context, null, 2)}\n\nProvide a comprehensive trading analysis.`;
 
   try {
     const text = await callGemini(prompt, systemPrompt);
@@ -115,12 +201,11 @@ Provide a comprehensive trading analysis.`;
       generatedAt: new Date().toISOString(),
     };
 
-    cacheService.set(cacheKey, result, 300_000); // 5 min cache
+    cacheService.set(cacheKey, result, 300_000);
     return result;
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     if (msg === 'RATE_LIMITED' || msg === 'INVALID_KEY') throw error;
-    // Try once more with simpler prompt
     throw new Error(`AI analysis failed: ${msg}`);
   }
 }
@@ -145,6 +230,22 @@ export async function getSentimentAnalysis(
     };
   }
 
+  if (isBackendEnabled()) {
+    try {
+      const response = await apiAiSentiment({ assetSymbol, headlines });
+      const normalized: SentimentResult = {
+        ...response,
+        source: response.source === 'gemini' || response.source === 'keyword' || response.source === 'none'
+          ? response.source
+          : 'gemini',
+      };
+      cacheService.set(cacheKey, normalized, 300_000);
+      return normalized;
+    } catch (error) {
+      console.warn('[AI] Backend sentiment failed, trying local Gemini:', error);
+    }
+  }
+
   const systemPrompt = `You are a financial sentiment analyst. Analyze the following news headlines and provide a sentiment assessment. Respond with valid JSON only.
 
 Respond with:
@@ -156,9 +257,7 @@ Respond with:
   "reasoning": "<2-3 sentence explanation>"
 }`;
 
-  const prompt = `Analyze sentiment for ${assetSymbol} based on these headlines:
-
-${headlines.map((h, i) => `${i + 1}. ${h}`).join('\n')}`;
+  const prompt = `Analyze sentiment for ${assetSymbol} based on these headlines:\n\n${headlines.map((h, i) => `${i + 1}. ${h}`).join('\n')}`;
 
   try {
     const text = await callGemini(prompt, systemPrompt);
@@ -173,7 +272,7 @@ ${headlines.map((h, i) => `${i + 1}. ${h}`).join('\n')}`;
       source: 'gemini',
     };
 
-    cacheService.set(cacheKey, result, 600_000); // 10 min cache
+    cacheService.set(cacheKey, result, 600_000);
     return result;
   } catch (error) {
     throw error;
@@ -184,9 +283,27 @@ ${headlines.map((h, i) => `${i + 1}. ${h}`).join('\n')}`;
 export async function getMarketSummary(
   marketData: Record<string, unknown>
 ): Promise<MarketSummary> {
-  const cacheKey = 'ai_market_summary';
+  const cacheKey = `ai_market_summary_${JSON.stringify(marketData).slice(0, 64)}`;
   const cached = cacheService.get<MarketSummary>(cacheKey);
   if (cached) return cached;
+
+  if (isBackendEnabled()) {
+    try {
+      const insights = await getDashboardInsights();
+      const mapped: MarketSummary = {
+        summary: insights.summary,
+        marketMood: insights.marketMood,
+        keyEvent: insights.keyDrivers[0] || 'No major events',
+        outlook: insights.portfolioActions[0] || 'Risk-first posture remains appropriate.',
+        source: insights.source === 'gemini' ? 'gemini' : 'rule-based',
+        generatedAt: insights.generatedAt,
+      };
+      cacheService.set(cacheKey, mapped, 90_000);
+      return mapped;
+    } catch (error) {
+      console.warn('[AI] Backend summary failed, trying local Gemini:', error);
+    }
+  }
 
   const systemPrompt = `You are a financial market commentator. Given today's market data, write a brief market summary. Respond with valid JSON only.
 
@@ -198,43 +315,55 @@ Respond with:
   "outlook": "<1 sentence forward-looking view with caveat>"
 }`;
 
-  const prompt = `Summarize today's market conditions:
+  const prompt = `Summarize today's market conditions:\n\n${JSON.stringify(marketData, null, 2)}`;
 
-${JSON.stringify(marketData, null, 2)}`;
+  const text = await callGemini(prompt, systemPrompt);
+  const parsed = parseJSON<Omit<MarketSummary, 'source' | 'generatedAt'>>(text);
 
-  try {
-    const text = await callGemini(prompt, systemPrompt);
-    const parsed = parseJSON<Omit<MarketSummary, 'source' | 'generatedAt'>>(text);
+  const result: MarketSummary = {
+    summary: parsed.summary || 'Market summary unavailable.',
+    marketMood: parsed.marketMood || 'mixed',
+    keyEvent: parsed.keyEvent || 'No major events',
+    outlook: parsed.outlook || 'Outlook uncertain.',
+    source: 'gemini',
+    generatedAt: new Date().toISOString(),
+  };
 
-    const result: MarketSummary = {
-      summary: parsed.summary || 'Market summary unavailable.',
-      marketMood: parsed.marketMood || 'mixed',
-      keyEvent: parsed.keyEvent || 'No major events',
-      outlook: parsed.outlook || 'Outlook uncertain.',
-      source: 'gemini',
-      generatedAt: new Date().toISOString(),
-    };
-
-    cacheService.set(cacheKey, result, 900_000); // 15 min cache
-    return result;
-  } catch (error) {
-    throw error;
-  }
+  cacheService.set(cacheKey, result, 900_000);
+  return result;
 }
 
-// ===== Helper: Check if Gemini is available =====
+// ===== Helper: Check if AI is available =====
 export function isGeminiAvailable(): boolean {
-  return !!getApiKey();
+  return isBackendEnabled() || !!getApiKey();
 }
 
 // ===== Trade Evaluation =====
 export async function callGeminiForTradeEval(params: {
-  side: string; symbol: string; quantity: number; price: number;
-  portfolioValue: number; assetType: string;
-}): Promise<import('@/types').TradeEvalResult> {
+  side: string;
+  symbol: string;
+  quantity: number;
+  price: number;
+  portfolioValue: number;
+  assetType: string;
+}): Promise<TradeEvalResult> {
   const cacheKey = `ai_trade_eval_${params.symbol}_${params.side}`;
-  const cached = cacheService.get<import('@/types').TradeEvalResult>(cacheKey);
+  const cached = cacheService.get<TradeEvalResult>(cacheKey);
   if (cached) return cached;
+
+  if (isBackendEnabled()) {
+    try {
+      const response = await apiAiTradeEval(params);
+      const normalized: TradeEvalResult = {
+        ...response,
+        source: response.source === 'gemini' || response.source === 'rule-based' ? response.source : 'backend',
+      };
+      cacheService.set(cacheKey, normalized, 120_000);
+      return normalized;
+    } catch (error) {
+      console.warn('[AI] Backend trade evaluation failed, trying local Gemini:', error);
+    }
+  }
 
   const systemPrompt = `You are a risk management advisor. A trader is considering a paper trade. Evaluate it and provide structured risk feedback. Respond with valid JSON only.
 
@@ -247,25 +376,21 @@ Respond with:
   "warning": "<optional warning or null>"
 }`;
 
-  const prompt = `Evaluate this paper trade:
-- Action: ${params.side.toUpperCase()} ${params.quantity.toFixed(4)} ${params.symbol}
-- Price: $${params.price.toFixed(2)}
-- Total: $${(params.quantity * params.price).toFixed(2)}
-- Portfolio Value: $${params.portfolioValue.toFixed(2)}
-- Asset Type: ${params.assetType}
-- Position as % of portfolio: ${((params.quantity * params.price / params.portfolioValue) * 100).toFixed(1)}%`;
+  const prompt = `Evaluate this paper trade:\n- Action: ${params.side.toUpperCase()} ${params.quantity.toFixed(4)} ${params.symbol}\n- Price: $${params.price.toFixed(2)}\n- Total: $${(params.quantity * params.price).toFixed(2)}\n- Portfolio Value: $${params.portfolioValue.toFixed(2)}\n- Asset Type: ${params.assetType}\n- Position as % of portfolio: ${((params.quantity * params.price / params.portfolioValue) * 100).toFixed(1)}%`;
 
   try {
     const text = await callGemini(prompt, systemPrompt);
-    const parsed = parseJSON<import('@/types').TradeEvalResult>(text);
-    const result: import('@/types').TradeEvalResult = {
+    const parsed = parseJSON<TradeEvalResult>(text);
+    const result: TradeEvalResult = {
       riskRating: parsed.riskRating || 'medium',
       positionSizeAssessment: parsed.positionSizeAssessment || 'appropriate',
       diversificationImpact: parsed.diversificationImpact || 'N/A',
       suggestions: Array.isArray(parsed.suggestions) ? parsed.suggestions.slice(0, 3) : [],
       warning: parsed.warning || undefined,
+      source: 'gemini',
+      generatedAt: new Date().toISOString(),
     };
-    cacheService.set(cacheKey, result, 120_000); // 2 min cache
+    cacheService.set(cacheKey, result, 120_000);
     return result;
   } catch {
     return {
@@ -273,6 +398,8 @@ Respond with:
       positionSizeAssessment: (params.quantity * params.price / params.portfolioValue) > 0.2 ? 'too_large' : 'appropriate',
       diversificationImpact: 'Unable to assess — AI unavailable',
       suggestions: ['Consider position size relative to portfolio', 'Set stop-loss to manage risk'],
+      source: 'rule-based',
+      generatedAt: new Date().toISOString(),
     };
   }
 }
@@ -284,7 +411,11 @@ const NEGATIVE_WORDS = ['crash', 'drop', 'fall', 'bear', 'plunge', 'decline', 'l
 export function keywordSentiment(headline: string): number {
   const lower = headline.toLowerCase();
   let score = 0;
-  POSITIVE_WORDS.forEach(w => { if (lower.includes(w)) score += 15; });
-  NEGATIVE_WORDS.forEach(w => { if (lower.includes(w)) score -= 15; });
+  POSITIVE_WORDS.forEach((w) => {
+    if (lower.includes(w)) score += 15;
+  });
+  NEGATIVE_WORDS.forEach((w) => {
+    if (lower.includes(w)) score -= 15;
+  });
   return Math.max(-100, Math.min(100, score));
 }

@@ -52,5 +52,13 @@ Base path: `/api/v2`
 - `GET /market/forex`
 - `GET /news`
 
+## AI Copilot
+- `POST /ai/chat`
+- `GET /ai/insights`
+- `POST /ai/analysis`
+- `POST /ai/sentiment`
+- `POST /ai/trade-eval`
+- `GET /ai/news-brief`
+
 ## Cron
 - `GET /cron/maintenance` (requires `CRON_SECRET`)

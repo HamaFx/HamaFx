@@ -18,6 +18,7 @@ Set these in Vercel for `Production`, `Preview`, and `Development`:
 - `CORS_ALLOWED_ORIGIN`
 - `NEWSDATA_API_KEY` (optional)
 - `COINGECKO_API_KEY` (optional)
+- `GEMINI_API_KEY` (recommended for backend AI copilot endpoints)
 - `PROTECTION_BYPASS_SECRET` (optional, recommended)
 - `VITE_BACKEND_MODE` (`off`, `shadow`, `on`)
 

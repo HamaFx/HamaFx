@@ -9,6 +9,7 @@ const envSchema = z.object({
   CORS_ALLOWED_ORIGIN: z.string().url(),
   NEWSDATA_API_KEY: z.string().optional(),
   COINGECKO_API_KEY: z.string().optional(),
+  GEMINI_API_KEY: z.string().optional(),
   PROTECTION_BYPASS_SECRET: z.string().optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 });

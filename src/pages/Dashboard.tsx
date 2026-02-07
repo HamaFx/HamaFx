@@ -12,9 +12,11 @@ import { usePortfolioStore } from '@/stores/portfolioStore';
 import { useWatchlistStore } from '@/stores/watchlistStore';
 import { useAlertStore } from '@/stores/alertStore';
 import { useAuthStore } from '@/stores/authStore';
+import { isBackendEnabled } from '@/services/backend/config';
+import { getDashboardInsights } from '@/services/gemini';
 import { AnimatedPrice, AnimatedPercent } from '@/components/ui/AnimatedPrice';
 import { StaggerContainer } from '@/components/ui/PageTransition';
-import type { Asset, ForexPair } from '@/types';
+import type { AiDashboardInsights, Asset, ForexPair } from '@/types';
 
 function formatPrice(price: number, assetType: 'crypto' | 'forex') {
   if (assetType === 'forex') return price.toFixed(4);
@@ -86,7 +88,10 @@ export default function Dashboard() {
   const { watchlists } = useWatchlistStore();
   const { alerts } = useAlertStore();
   const { user } = useAuthStore();
+  const backendAiReady = isBackendEnabled();
   const [onboardingDismissed, setOnboardingDismissed] = useState(() => localStorage.getItem('hamafx_onboarding_dismissed') === '1');
+  const [aiInsights, setAiInsights] = useState<AiDashboardInsights | null>(null);
+  const [aiInsightsLoading, setAiInsightsLoading] = useState(false);
   const activeAlerts = alerts.filter(a => a.isActive && !a.isTriggered);
   const triggeredAlerts = alerts.filter(a => a.isTriggered);
   const portfolioValue = getTotalValue();
@@ -97,8 +102,8 @@ export default function Dashboard() {
     { label: 'Start demo', done: !!user, href: '/login' },
     { label: 'Place first trade', done: tradeHistory.length > 0, href: '/markets' },
     { label: 'Create first alert', done: alerts.length > 0, href: '/alerts' },
-    { label: 'Configure AI key', done: hasGeminiKey(), href: '/settings' },
-  ]), [alerts.length, hasGeminiKey, tradeHistory.length, user]);
+    { label: 'Configure AI key', done: hasGeminiKey() || backendAiReady, href: '/settings' },
+  ]), [alerts.length, backendAiReady, hasGeminiKey, tradeHistory.length, user]);
   const onboardingComplete = onboardingItems.every((item) => item.done);
 
   useEffect(() => {
@@ -109,6 +114,27 @@ export default function Dashboard() {
     const fxCleanup = startForexPolling();
     return () => { wsCleanup(); fxCleanup(); };
   }, [fetchCrypto, fetchForex, startWebSocket, startForexPolling]);
+
+  useEffect(() => {
+    let active = true;
+    if (cryptoAssets.length === 0 && forexPairs.length === 0) return;
+
+    setAiInsightsLoading(true);
+    void getDashboardInsights()
+      .then((next) => {
+        if (active) setAiInsights(next);
+      })
+      .catch((error) => {
+        console.warn('[Dashboard] AI insights unavailable:', error);
+      })
+      .finally(() => {
+        if (active) setAiInsightsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [alerts.length, cryptoAssets.length, forexPairs.length, positions.length, tradeHistory.length]);
 
   // Watchlist items
   const defaultWl = watchlists.length > 0 ? watchlists[0] : null;
@@ -203,7 +229,7 @@ export default function Dashboard() {
       )}
 
       {/* AI Setup Prompt */}
-      {!hasGeminiKey() && (
+      {!hasGeminiKey() && !backendAiReady && (
         <Link
           to="/settings"
           className="w-full bg-violet-500/10 border border-violet-500/20 rounded-xl p-4 flex items-center gap-4 hover:bg-violet-500/15 transition-[background-color,transform] duration-200 hover:scale-[1.005] text-left group animate-scale-in"
@@ -401,37 +427,52 @@ export default function Dashboard() {
               </h2>
               <span className={cn(
                 'text-xs px-2 py-0.5 rounded-full font-medium',
-                hasGeminiKey() ? 'bg-violet-500/15 text-violet-400' : 'bg-slate-500/10 text-slate-500'
+                aiInsights?.source === 'gemini' || hasGeminiKey() || backendAiReady
+                  ? 'bg-violet-500/15 text-violet-400'
+                  : 'bg-slate-500/10 text-slate-500'
               )}>
-                {hasGeminiKey() ? '🤖 AI' : '📊 Auto'}
+                {aiInsights?.source === 'gemini' ? '🤖 AI' : aiInsights ? '🧠 Copilot' : '📊 Auto'}
               </span>
             </div>
             <div className="p-4">
-              {cryptoAssets.length > 0 ? (
+              {aiInsightsLoading && (
+                <Shimmer className="h-20 w-full" />
+              )}
+              {!aiInsightsLoading && aiInsights ? (
                 <>
-                  <p className="text-sm text-slate-300 leading-relaxed">
-                    {(() => {
-                      const btc = cryptoAssets.find(a => a.symbol === 'BTC');
-                      const eth = cryptoAssets.find(a => a.symbol === 'ETH');
-                      const avgChange = cryptoAssets.slice(0, 10).reduce((s, a) => s + a.changePercent24h, 0) / 10;
-                      const mood = avgChange > 2 ? 'bullish' : avgChange < -2 ? 'bearish' : 'mixed';
-                      return `Markets are ${mood} today. ${btc ? `BTC $${formatPrice(btc.price, 'crypto')} (${btc.changePercent24h >= 0 ? '+' : ''}${btc.changePercent24h.toFixed(1)}%)` : ''}, ${eth ? `ETH $${formatPrice(eth.price, 'crypto')} (${eth.changePercent24h >= 0 ? '+' : ''}${eth.changePercent24h.toFixed(1)}%)` : ''}. ${mood === 'bullish' ? 'Positive momentum.' : mood === 'bearish' ? 'Caution advised.' : 'Mixed signals.'}`;
-                    })()}
-                  </p>
+                  <p className="text-sm text-slate-300 leading-relaxed">{aiInsights.summary}</p>
+                  {aiInsights.keyDrivers.length > 0 && (
+                    <ul className="mt-3 space-y-1.5">
+                      {aiInsights.keyDrivers.slice(0, 3).map((driver) => (
+                        <li key={driver} className="text-xs text-slate-400 flex items-start gap-1.5">
+                          <span className="text-indigo-400 mt-0.5">•</span>
+                          <span>{driver}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                   <div className="mt-3">
                     <span className={cn(
                       'text-xs px-2 py-0.5 rounded-full font-medium',
-                      (() => {
-                        const avg = cryptoAssets.slice(0, 10).reduce((s, a) => s + a.changePercent24h, 0) / 10;
-                        return avg > 2 ? 'bg-emerald-500/10 text-emerald-400' : avg < -2 ? 'bg-red-500/10 text-red-400' : 'bg-amber-500/10 text-amber-400';
-                      })()
+                      aiInsights.marketMood === 'risk-on'
+                        ? 'bg-emerald-500/10 text-emerald-400'
+                        : aiInsights.marketMood === 'risk-off'
+                        ? 'bg-red-500/10 text-red-400'
+                        : 'bg-amber-500/10 text-amber-400'
                     )}>
-                      Mood: {(() => {
-                        const avg = cryptoAssets.slice(0, 10).reduce((s, a) => s + a.changePercent24h, 0) / 10;
-                        return avg > 2 ? 'Risk-On 🟢' : avg < -2 ? 'Risk-Off 🔴' : 'Neutral 🟡';
-                      })()}
+                      Mood: {aiInsights.marketMood === 'risk-on' ? 'Risk-On 🟢' : aiInsights.marketMood === 'risk-off' ? 'Risk-Off 🔴' : 'Mixed 🟡'}
                     </span>
                   </div>
+                  {aiInsights.riskFlags.length > 0 && (
+                    <div className="mt-3 space-y-1.5">
+                      {aiInsights.riskFlags.slice(0, 2).map((flag) => (
+                        <p key={flag} className="text-xs text-amber-300/90 flex items-start gap-1.5">
+                          <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                          <span>{flag}</span>
+                        </p>
+                      ))}
+                    </div>
+                  )}
                 </>
               ) : (
                 <Shimmer className="h-20 w-full" />
@@ -450,7 +491,7 @@ export default function Dashboard() {
               <Zap className="w-4 h-4 text-amber-400" /> Trading Signals
             </h2>
             <div className="flex items-center gap-1.5 text-xs text-slate-500">
-              {hasGeminiKey() ? (
+              {hasGeminiKey() || backendAiReady ? (
                 <><Bot className="w-3 h-3 text-violet-400" /> AI-Powered</>
               ) : (
                 <><BarChart3 className="w-3 h-3" /> Algorithm</>

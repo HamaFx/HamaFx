@@ -8,6 +8,9 @@ export interface ChatMessage {
   content: string;
   timestamp: number;
   context?: string; // what page/asset the user was on
+  followUps?: string[];
+  riskLevel?: 'low' | 'medium' | 'high';
+  source?: 'gemini' | 'rule-based' | 'backend';
 }
 
 interface ChatState {
@@ -18,7 +21,12 @@ interface ChatState {
   toggleChat: () => void;
   openChat: () => void;
   closeChat: () => void;
-  addMessage: (role: 'user' | 'assistant', content: string, context?: string) => void;
+  addMessage: (
+    role: 'user' | 'assistant',
+    content: string,
+    context?: string,
+    metadata?: Pick<ChatMessage, 'followUps' | 'riskLevel' | 'source'>
+  ) => void;
   setLoading: (v: boolean) => void;
   clearHistory: () => void;
   loadMessages: () => void;
@@ -70,6 +78,18 @@ function loadMessagesFromStorage(userId: string = getCurrentUserId()): ChatMessa
         typeof msg.content === 'string' &&
         typeof msg.timestamp === 'number'
       )
+      .map((msg) => ({
+        ...msg,
+        followUps: Array.isArray(msg.followUps)
+          ? msg.followUps.filter((item) => typeof item === 'string').slice(0, 4)
+          : undefined,
+        riskLevel: msg.riskLevel === 'low' || msg.riskLevel === 'medium' || msg.riskLevel === 'high'
+          ? msg.riskLevel
+          : undefined,
+        source: msg.source === 'gemini' || msg.source === 'rule-based' || msg.source === 'backend'
+          ? msg.source
+          : undefined,
+      }))
       .slice(-MAX_MESSAGES);
   } catch {
     return [];
@@ -91,7 +111,7 @@ export const useChatStore = create<ChatState>((set) => ({
   openChat: () => set({ isOpen: true }),
   closeChat: () => set({ isOpen: false }),
 
-  addMessage: (role, content, context) =>
+  addMessage: (role, content, context, metadata) =>
     set((s) => {
       const messages = [
         ...s.messages,
@@ -101,6 +121,7 @@ export const useChatStore = create<ChatState>((set) => ({
           content,
           timestamp: Date.now(),
           context,
+          ...(metadata ?? {}),
         },
       ].slice(-MAX_MESSAGES);
       saveMessages(messages);

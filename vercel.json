@@ -4,6 +4,9 @@
     "api/v2/cron/maintenance.ts": {
       "maxDuration": 30
     },
+    "api/v2/ai/[action].ts": {
+      "maxDuration": 30
+    },
     "api/v2/**/*.ts": {
       "maxDuration": 15
     }

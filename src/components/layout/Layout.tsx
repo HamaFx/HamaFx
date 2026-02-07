@@ -14,6 +14,7 @@ import AIChatDrawer from '../AIChatDrawer';
 import { useChatStore } from '@/stores/chatStore';
 import { MessageCircle } from 'lucide-react';
 import { PageTransition } from '@/components/ui/PageTransition';
+import { isBackendEnabled } from '@/services/backend/config';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
@@ -65,6 +66,7 @@ export function Layout() {
   const { settings, setTheme, hasGeminiKey } = useSettingsStore();
   const { isOpen: chatOpen, toggleChat } = useChatStore();
   const navigate = useNavigate();
+  const aiConnected = hasGeminiKey() || isBackendEnabled();
   const isDark = settings.theme === 'dark' || (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
   const riskPosture = (() => {
     if (!settings.trading.enableRiskGuardrails) {
@@ -113,11 +115,11 @@ export function Layout() {
         <div className="px-3 py-2">
           <div className={cn(
             'flex items-center gap-2 px-3 py-2 rounded-lg text-xs',
-            hasGeminiKey() ? 'bg-violet-500/10 text-violet-400' : 'bg-slate-500/10 text-slate-500'
+            aiConnected ? 'bg-violet-500/10 text-violet-400' : 'bg-slate-500/10 text-slate-500'
           )}>
             <Bot className="w-4 h-4" />
-            <span>{hasGeminiKey() ? 'AI Connected' : 'AI Not Configured'}</span>
-            {!hasGeminiKey() && (
+            <span>{aiConnected ? 'AI Connected' : 'AI Not Configured'}</span>
+            {!aiConnected && (
               <button type="button" aria-label="Open settings to configure AI" onClick={() => navigate('/settings')} className="ml-auto">
                 <ChevronRight className="w-3 h-3" />
               </button>
@@ -197,9 +199,9 @@ export function Layout() {
             {/* AI Status Badge */}
             <div className={cn(
               'hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium',
-              hasGeminiKey() ? 'bg-violet-500/15 text-violet-400' : 'bg-slate-500/10 text-slate-500'
+              aiConnected ? 'bg-violet-500/15 text-violet-400' : 'bg-slate-500/10 text-slate-500'
             )}>
-              <div className={cn('w-1.5 h-1.5 rounded-full', hasGeminiKey() ? 'bg-violet-400' : 'bg-slate-500')} />
+              <div className={cn('w-1.5 h-1.5 rounded-full', aiConnected ? 'bg-violet-400' : 'bg-slate-500')} />
               AI
             </div>
 

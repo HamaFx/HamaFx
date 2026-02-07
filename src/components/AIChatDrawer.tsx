@@ -16,6 +16,7 @@ import {
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useChatStore, type ChatMessage as StoredChatMessage } from '@/stores/chatStore';
 import { sendChatMessage } from '@/services/chatService';
+import { isBackendEnabled } from '@/services/backend/config';
 
 const WELCOME_FEATURES = [
   { icon: TrendingUp, title: 'Market Analysis', desc: "Ask about any asset's price action and trends", color: 'text-emerald-400' },
@@ -59,6 +60,7 @@ export default function AIChatDrawer() {
     clearHistory,
   } = useChatStore();
   const { settings } = useSettingsStore();
+  const backendAiReady = isBackendEnabled();
 
   const [input, setInput] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -95,7 +97,11 @@ export default function AIChatDrawer() {
 
     try {
       const reply = await sendChatMessage(trimmed, historyBefore as StoredChatMessage[]);
-      addMessage('assistant', reply);
+      addMessage('assistant', reply.reply, undefined, {
+        followUps: reply.followUps,
+        riskLevel: reply.riskLevel,
+        source: reply.source,
+      });
     } catch (err) {
       addMessage(
         'assistant',
@@ -140,9 +146,9 @@ export default function AIChatDrawer() {
             <div>
               <h2 className="font-bold text-white text-sm">HamaFX AI</h2>
               <div className="flex items-center gap-1.5">
-                <div className={`w-1.5 h-1.5 rounded-full ${settings.apiKeys.gemini?.key ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                <div className={`w-1.5 h-1.5 rounded-full ${backendAiReady || settings.apiKeys.gemini?.key ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
                 <span className="text-xs text-gray-400">
-                  {settings.apiKeys.gemini?.key ? 'Gemini Connected' : 'Local Mode'}
+                  {backendAiReady ? 'Backend Copilot' : settings.apiKeys.gemini?.key ? 'Gemini Connected' : 'Local Mode'}
                 </span>
               </div>
             </div>
@@ -202,7 +208,11 @@ export default function AIChatDrawer() {
               {visibleMessages.map((msg, index) => {
                 const isLatestAssistant = msg.role === 'assistant' &&
                   visibleMessages.slice(index + 1).every((m) => m.role !== 'assistant');
-                const followUps = isLatestAssistant ? generateFollowUps(msg.content) : [];
+                const followUps = isLatestAssistant
+                  ? (Array.isArray(msg.followUps) && msg.followUps.length > 0
+                    ? msg.followUps
+                    : generateFollowUps(msg.content))
+                  : [];
 
                 return (
                   <div key={msg.id} className={`flex gap-2.5 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -223,6 +233,19 @@ export default function AIChatDrawer() {
                         <span className="text-xs text-gray-600">
                           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
+                        {msg.role === 'assistant' && msg.riskLevel && (
+                          <span
+                            className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                              msg.riskLevel === 'high'
+                                ? 'bg-red-500/10 text-red-400'
+                                : msg.riskLevel === 'medium'
+                                ? 'bg-amber-500/10 text-amber-400'
+                                : 'bg-emerald-500/10 text-emerald-400'
+                            }`}
+                          >
+                            risk: {msg.riskLevel}
+                          </span>
+                        )}
                         {msg.role === 'assistant' && msg.content && (
                           <button
                             onClick={() => copyMessage(msg.id, msg.content)}

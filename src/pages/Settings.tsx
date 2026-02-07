@@ -42,6 +42,7 @@ export default function Settings() {
   const [geminiError, setGeminiError] = useState('');
   const [migrationBusy, setMigrationBusy] = useState(false);
   const [migrationResult, setMigrationResult] = useState<string>('');
+  const backendAiMode = isBackendEnabled();
   const userId = user?.id || 'demo';
   const storageUsageKb = getStorageUsageKb();
   const storageUsagePercent = Math.min((storageUsageKb / STORAGE_LIMIT_KB) * 100, 100);
@@ -216,7 +217,7 @@ export default function Settings() {
                   <p className="text-xs text-slate-500">Powers AI analysis, signals, and chat</p>
                 </div>
               </div>
-              {settings.apiKeys.gemini?.isValid ? (
+              {backendAiMode || settings.apiKeys.gemini?.isValid ? (
                 <PremiumBadge variant="success" size="sm" dot pulse>Connected</PremiumBadge>
               ) : (
                 <PremiumBadge variant="warning" size="sm">Not configured</PremiumBadge>
@@ -225,7 +226,14 @@ export default function Settings() {
 
             <GlassDivider />
 
-            {settings.apiKeys.gemini?.isValid ? (
+            {backendAiMode ? (
+              <div className="bg-violet-500/10 border border-violet-500/20 rounded-xl px-4 py-3">
+                <p className="text-xs text-violet-200 font-medium">Backend AI mode is active.</p>
+                <p className="text-xs text-violet-300/80 mt-1">
+                  HamaFX server-side AI is driving analysis and chat. Your local Gemini key is optional fallback.
+                </p>
+              </div>
+            ) : settings.apiKeys.gemini?.isValid ? (
               <div className="space-y-3">
                 <div className="flex items-center gap-2 bg-nexus-elevated rounded-xl px-4 py-3">
                   <span className="text-sm text-slate-400 font-mono flex-1 tracking-wider">
