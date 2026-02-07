@@ -1,0 +1,30 @@
+name: Uptime Monitor
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  healthcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate secret presence
+        env:
+          PROD_HEALTHCHECK_URL: ${{ vars.PROD_HEALTHCHECK_URL || secrets.PROD_HEALTHCHECK_URL }}
+        run: |
+          if [ -z "$PROD_HEALTHCHECK_URL" ]; then
+            echo "Missing required variable/secret: PROD_HEALTHCHECK_URL"
+            exit 1
+          fi
+
+      - name: Ping production URL
+        env:
+          PROD_HEALTHCHECK_URL: ${{ vars.PROD_HEALTHCHECK_URL || secrets.PROD_HEALTHCHECK_URL }}
+        run: |
+          status=$(curl -sS -o /dev/null -w "%{http_code}" "$PROD_HEALTHCHECK_URL")
+          echo "HTTP status: $status"
+          if [ "$status" -lt 200 ] || [ "$status" -ge 400 ]; then
+            echo "Healthcheck failed for $PROD_HEALTHCHECK_URL"
+            exit 1
+          fi

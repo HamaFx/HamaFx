@@ -46,7 +46,7 @@ function NavItem({ to, icon: Icon, label, collapsed, onClick }: {
       to={to}
       onClick={onClick}
       className={({ isActive }) => cn(
-        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
+        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150',
         isActive
           ? 'bg-nexus-accent/15 text-indigo-400'
           : 'text-slate-400 hover:text-slate-200 hover:bg-white/5',
@@ -66,6 +66,20 @@ export function Layout() {
   const { isOpen: chatOpen, toggleChat } = useChatStore();
   const navigate = useNavigate();
   const isDark = settings.theme === 'dark' || (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const riskPosture = (() => {
+    if (!settings.trading.enableRiskGuardrails) {
+      return { label: 'Risk Off', tone: 'bg-red-500/15 text-red-300' };
+    }
+    const conservative = settings.trading.maxPositionSizePercent <= 15
+      && settings.trading.maxDailyLossPercent <= 3
+      && settings.trading.maxOpenPositions <= 5;
+    const aggressive = settings.trading.maxPositionSizePercent >= 40
+      || settings.trading.maxDailyLossPercent >= 10
+      || settings.trading.maxOpenPositions >= 15;
+    if (conservative) return { label: 'Risk Low', tone: 'bg-emerald-500/15 text-emerald-300' };
+    if (aggressive) return { label: 'Risk High', tone: 'bg-amber-500/15 text-amber-300' };
+    return { label: 'Risk Med', tone: 'bg-blue-500/15 text-blue-300' };
+  })();
 
   const handleLogout = () => {
     logout();
@@ -73,7 +87,9 @@ export function Layout() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-nexus-bg">
+    <>
+      <a href="#main-content" className="skip-link">Skip to main content</a>
+      <div className="flex h-screen overflow-hidden bg-nexus-bg">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-60 border-r border-nexus-border bg-nexus-card shrink-0">
         {/* Logo */}
@@ -102,7 +118,7 @@ export function Layout() {
             <Bot className="w-4 h-4" />
             <span>{hasGeminiKey() ? 'AI Connected' : 'AI Not Configured'}</span>
             {!hasGeminiKey() && (
-              <button onClick={() => navigate('/settings')} className="ml-auto">
+              <button type="button" aria-label="Open settings to configure AI" onClick={() => navigate('/settings')} className="ml-auto">
                 <ChevronRight className="w-3 h-3" />
               </button>
             )}
@@ -119,7 +135,7 @@ export function Layout() {
               <p className="text-sm font-medium truncate">{user?.username || 'User'}</p>
               <p className="text-xs text-slate-500 truncate">{user?.email || ''}</p>
             </div>
-            <button onClick={handleLogout} className="p-1.5 rounded-lg hover:bg-white/5 text-slate-500 hover:text-slate-300" title="Logout">
+            <button type="button" onClick={handleLogout} aria-label="Log out" className="p-1.5 rounded-lg hover:bg-white/5 text-slate-500 hover:text-slate-300" title="Logout">
               <LogOut className="w-4 h-4" />
             </button>
           </div>
@@ -129,7 +145,7 @@ export function Layout() {
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
-          <div className="fixed inset-0 bg-black/60" onClick={() => setSidebarOpen(false)} />
+          <button type="button" aria-label="Close navigation menu" className="fixed inset-0 bg-black/60" onClick={() => setSidebarOpen(false)} />
           <div className="relative w-72 bg-nexus-card flex flex-col animate-fade-in">
             <div className="flex items-center justify-between px-5 h-16 border-b border-nexus-border">
               <div className="flex items-center gap-2.5">
@@ -138,7 +154,7 @@ export function Layout() {
                 </div>
                 <span className="font-bold bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">HamaFX</span>
               </div>
-              <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg hover:bg-white/5">
+              <button type="button" onClick={() => setSidebarOpen(false)} aria-label="Close navigation menu" className="p-2 rounded-lg hover:bg-white/5">
                 <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
@@ -148,7 +164,7 @@ export function Layout() {
               ))}
             </nav>
             <div className="px-3 py-3 border-t border-nexus-border">
-              <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-red-400 hover:bg-red-500/10">
+              <button type="button" onClick={handleLogout} className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg text-sm text-red-400 hover:bg-red-500/10">
                 <LogOut className="w-5 h-5" /> Logout
               </button>
             </div>
@@ -162,6 +178,7 @@ export function Layout() {
         <header className="h-14 md:h-16 border-b border-nexus-border bg-nexus-card flex items-center justify-between px-4 md:px-6 shrink-0">
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={() => setSidebarOpen(true)}
               className="md:hidden p-2 -ml-2 rounded-lg hover:bg-white/5"
               aria-label="Open navigation menu"
@@ -191,6 +208,7 @@ export function Layout() {
 
             {/* Theme Toggle */}
             <button
+              type="button"
               onClick={() => setTheme(isDark ? 'light' : 'dark')}
               className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-slate-200 transition-colors"
               aria-label="Toggle theme"
@@ -200,15 +218,20 @@ export function Layout() {
 
             {/* AI Chat Toggle */}
             <button
+              type="button"
               onClick={toggleChat}
               className={cn(
                 'p-2 rounded-lg transition-colors',
                 chatOpen ? 'bg-purple-500/20 text-purple-400' : 'hover:bg-white/5 text-slate-400 hover:text-slate-200'
               )}
-              aria-label="Toggle AI Chat"
+              aria-label={chatOpen ? 'Close AI chat' : 'Open AI chat'}
             >
               <MessageCircle className="w-4.5 h-4.5" />
             </button>
+
+            <div className={cn('hidden sm:flex items-center rounded-full px-2.5 py-1 text-xs font-semibold', riskPosture.tone)}>
+              {riskPosture.label}
+            </div>
 
             {/* Notification Center */}
             <NotificationCenter />
@@ -216,7 +239,7 @@ export function Layout() {
         </header>
 
         {/* Page Content */}
-        <main className="flex-1 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
           <PageTransition>
             <Outlet />
           </PageTransition>
@@ -235,7 +258,7 @@ export function Layout() {
             )}
           >
             <Icon className="w-5 h-5" />
-            <span className="text-[10px] font-medium">{label}</span>
+            <span className="text-xs font-medium">{label}</span>
           </NavLink>
         ))}
       </nav>
@@ -246,6 +269,7 @@ export function Layout() {
       {/* Floating Chat Button (mobile) */}
       {!chatOpen && (
         <button
+          type="button"
           onClick={toggleChat}
           className="md:hidden fixed right-4 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg shadow-purple-500/25 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform bottom-[calc(5.25rem+env(safe-area-inset-bottom))]"
           aria-label="Open AI Chat"
@@ -256,10 +280,11 @@ export function Layout() {
 
       {/* Risk Disclaimer Footer */}
       <div className="hidden md:block fixed bottom-0 left-60 right-0 px-4 py-1.5 bg-nexus-card/80 backdrop-blur border-t border-nexus-border z-30">
-        <p className="text-[10px] text-slate-600 text-center">
+        <p className="text-xs text-slate-600 text-center">
           ⚠️ Paper trading only. Not financial advice. AI signals are for educational purposes. Past performance ≠ future results.
         </p>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

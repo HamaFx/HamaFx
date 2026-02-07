@@ -1,4 +1,5 @@
-import { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, useEffect, useRef } from 'react';
+import { ReactNode, ButtonHTMLAttributes, InputHTMLAttributes, useEffect, useId, useRef } from 'react';
+import { Link } from 'react-router-dom';
 import { cn } from '@/utils/cn';
 import { X } from 'lucide-react';
 
@@ -45,7 +46,7 @@ export function PremiumButton({
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center font-semibold transition-all duration-200',
+        'inline-flex items-center justify-center font-semibold transition-[background-color,color,border-color,box-shadow,transform,opacity] duration-200',
         'active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100',
         btnVariants[variant],
         btnSizes[size],
@@ -80,6 +81,9 @@ interface PremiumCardProps {
   glow?: 'indigo' | 'emerald' | 'red' | 'purple' | 'amber' | 'blue' | null;
   gradient?: boolean;
   onClick?: () => void;
+  asLink?: boolean;
+  to?: string;
+  ariaLabel?: string;
 }
 
 const glowBorders: Record<string, string> = {
@@ -99,20 +103,38 @@ export function PremiumCard({
   glow,
   gradient,
   onClick,
+  asLink,
+  to,
+  ariaLabel,
 }: PremiumCardProps) {
+  const cardClass = cn(
+    'rounded-xl border border-nexus-border bg-nexus-card overflow-hidden transition-[background-color,border-color,box-shadow,transform] duration-300',
+    glass && 'glass-card',
+    hover && 'card-hover',
+    glow && glowBorders[glow],
+    gradient && 'gradient-border',
+    (onClick || asLink || to) && 'cursor-pointer',
+    className
+  );
+
+  if (asLink || to) {
+    return (
+      <Link to={to ?? '#'} aria-label={ariaLabel} className={cardClass}>
+        {children}
+      </Link>
+    );
+  }
+
+  if (onClick) {
+    return (
+      <button type="button" onClick={onClick} aria-label={ariaLabel} className={cn(cardClass, 'w-full text-left')}>
+        {children}
+      </button>
+    );
+  }
+
   return (
-    <div
-      onClick={onClick}
-      className={cn(
-        'rounded-xl border border-nexus-border bg-nexus-card overflow-hidden transition-all duration-300',
-        glass && 'glass-card',
-        hover && 'card-hover cursor-pointer',
-        glow && glowBorders[glow],
-        gradient && 'gradient-border',
-        onClick && 'cursor-pointer',
-        className
-      )}
-    >
+    <div className={cardClass}>
       {children}
     </div>
   );
@@ -134,8 +156,12 @@ export function PremiumInput({
   error,
   size = 'md',
   className,
+  id,
   ...props
 }: PremiumInputProps) {
+  const generatedId = useId();
+  const inputId = id ?? generatedId;
+  const describedBy = error ? `${inputId}-error` : props['aria-describedby'];
   const sizes = {
     sm: 'text-xs px-3 py-2',
     md: 'text-sm px-4 py-2.5',
@@ -144,16 +170,23 @@ export function PremiumInput({
 
   return (
     <div className="w-full">
-      {label && <label className="text-xs text-slate-400 font-medium mb-1.5 block">{label}</label>}
+      {label && (
+        <label htmlFor={inputId} className="text-xs text-slate-400 font-medium mb-1.5 block">
+          {label}
+        </label>
+      )}
       <div className="relative">
         {icon && (
           <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">{icon}</div>
         )}
         <input
+          id={inputId}
+          aria-invalid={!!error}
+          aria-describedby={describedBy}
           className={cn(
             'w-full rounded-xl border bg-nexus-elevated/50 text-white placeholder-slate-500',
             'border-nexus-border focus:border-indigo-500/50 focus:ring-2 focus:ring-indigo-500/20',
-            'outline-none transition-all duration-200',
+            'outline-none transition-[border-color,box-shadow,color,background-color] duration-200',
             sizes[size],
             icon && 'pl-10',
             error && 'border-red-500/50 focus:border-red-500/50 focus:ring-red-500/20',
@@ -162,7 +195,7 @@ export function PremiumInput({
           {...props}
         />
       </div>
-      {error && <p className="text-xs text-red-400 mt-1">{error}</p>}
+      {error && <p id={`${inputId}-error`} className="text-xs text-red-400 mt-1">{error}</p>}
     </div>
   );
 }
@@ -247,6 +280,7 @@ export function PremiumModal({
   className,
 }: PremiumModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
 
   useEffect(() => {
     if (!isOpen) return;
@@ -260,10 +294,13 @@ export function PremiumModal({
   const sizeClass = size === 'sm' ? 'max-w-sm' : size === 'lg' ? 'max-w-2xl' : 'max-w-lg';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 modal-scroll-contain">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
       <div
         ref={modalRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
         className={cn(
           'relative w-full rounded-2xl border border-nexus-border bg-nexus-card shadow-premium animate-scale-in',
           sizeClass,
@@ -272,8 +309,13 @@ export function PremiumModal({
       >
         {title && (
           <div className="flex items-center justify-between px-5 py-4 border-b border-nexus-border">
-            <h3 className="text-lg font-bold">{title}</h3>
-            <button onClick={onClose} className="p-1.5 rounded-lg text-slate-500 hover:bg-white/5 hover:text-white transition-colors">
+            <h3 id={titleId} className="text-lg font-bold">{title}</h3>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close dialog"
+              className="p-1.5 rounded-lg text-slate-500 hover:bg-white/5 hover:text-white transition-colors"
+            >
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -293,27 +335,35 @@ interface PremiumToggleProps {
   label?: string;
   description?: string;
   size?: 'sm' | 'md';
+  ariaLabel?: string;
 }
 
-export function PremiumToggle({ enabled, onChange, label, description, size = 'md' }: PremiumToggleProps) {
+export function PremiumToggle({ enabled, onChange, label, description, size = 'md', ariaLabel }: PremiumToggleProps) {
+  const toggleId = useId();
   const trackSize = size === 'sm' ? 'w-9 h-5' : 'w-11 h-6';
   const knobSize = size === 'sm' ? 'w-3.5 h-3.5' : 'w-4.5 h-4.5';
   const translate = size === 'sm' ? 'translate-x-4' : 'translate-x-5';
+  const labelId = label ? `${toggleId}-label` : undefined;
+  const descriptionId = description ? `${toggleId}-description` : undefined;
 
   return (
     <label className="flex items-center justify-between gap-3 cursor-pointer group">
       {(label || description) && (
         <div>
-          {label && <span className="text-sm font-medium text-slate-200 group-hover:text-white transition-colors">{label}</span>}
-          {description && <p className="text-xs text-slate-500 mt-0.5">{description}</p>}
+          {label && <span id={labelId} className="text-sm font-medium text-slate-200 group-hover:text-white transition-colors">{label}</span>}
+          {description && <p id={descriptionId} className="text-xs text-slate-500 mt-0.5">{description}</p>}
         </div>
       )}
       <button
+        type="button"
         role="switch"
         aria-checked={enabled}
+        aria-label={ariaLabel ?? label ?? 'Toggle setting'}
+        aria-labelledby={labelId}
+        aria-describedby={descriptionId}
         onClick={() => onChange(!enabled)}
         className={cn(
-          'relative inline-flex shrink-0 rounded-full transition-all duration-300',
+          'relative inline-flex shrink-0 rounded-full transition-[background-color,border-color,box-shadow] duration-300',
           trackSize,
           enabled
             ? 'bg-gradient-to-r from-indigo-500 to-violet-500 shadow-glow-indigo'
@@ -353,7 +403,7 @@ export function TabBar<T extends string>({ tabs, active, onChange, size = 'sm', 
           key={tab.id}
           onClick={() => onChange(tab.id)}
           className={cn(
-            'flex items-center gap-1.5 rounded-lg font-medium transition-all duration-200',
+            'flex items-center gap-1.5 rounded-lg font-medium transition-colors duration-200',
             size === 'sm' ? 'text-xs px-3 py-1.5' : 'text-sm px-4 py-2',
             active === tab.id
               ? 'bg-nexus-card text-white shadow-sm'
@@ -391,7 +441,7 @@ interface StatCardProps {
 export function StatCard({ label, value, icon, change, subtitle, className }: StatCardProps) {
   return (
     <div className={cn(
-      'rounded-xl border border-nexus-border bg-nexus-card p-4 transition-all hover:border-nexus-elevated',
+      'rounded-xl border border-nexus-border bg-nexus-card p-4 transition-colors hover:border-nexus-elevated',
       className
     )}>
       <div className="flex items-center justify-between mb-2">

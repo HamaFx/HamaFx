@@ -57,13 +57,21 @@ export default function ToastContainer() {
   if (toasts.length === 0) return null;
 
   return (
-    <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 w-80 max-w-[90vw]">
+    <div
+      className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 w-80 max-w-[90vw]"
+      role="region"
+      aria-label="Notifications"
+      aria-live="polite"
+      aria-relevant="additions text"
+    >
       {toasts.map((t) => {
         const elapsed = Date.now() - t.createdAt;
         const progress = Math.max(0, 1 - elapsed / t.duration);
         return (
           <div
             key={t.id}
+            role={t.type === 'error' ? 'alert' : 'status'}
+            aria-atomic="true"
             className={`relative border-l-4 rounded-lg shadow-2xl backdrop-blur-xl overflow-hidden ${colors[t.type]}`}
             style={{ animation: 'toast-in 0.4s cubic-bezier(0.34,1.56,0.64,1)' }}
           >
@@ -75,7 +83,14 @@ export default function ToastContainer() {
                 <p className="text-sm font-semibold text-white">{t.title}</p>
                 {t.message && <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{t.message}</p>}
               </div>
-              <button onClick={() => removeToast(t.id)} className="text-gray-500 hover:text-white text-lg leading-none">×</button>
+              <button
+                type="button"
+                onClick={() => removeToast(t.id)}
+                aria-label={`Dismiss notification: ${t.title}`}
+                className="text-gray-500 hover:text-white text-lg leading-none"
+              >
+                ×
+              </button>
             </div>
             <div className="h-0.5 w-full bg-gray-800">
               <div className={`h-full ${barColors[t.type]} transition-all duration-100`} style={{ width: `${progress * 100}%` }} />

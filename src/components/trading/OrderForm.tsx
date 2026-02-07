@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AlertTriangle, TrendingUp, TrendingDown, DollarSign, Info, Bot, Loader2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { usePortfolioStore } from '@/stores/portfolioStore';
@@ -33,6 +33,9 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
   const [aiEval, setAiEval] = useState<TradeEvalResult | null>(null);
   const [aiEvalLoading, setAiEvalLoading] = useState(false);
   const [riskAcknowledged, setRiskAcknowledged] = useState(false);
+  const limitPriceInputRef = useRef<HTMLInputElement>(null);
+  const amountInputRef = useRef<HTMLInputElement>(null);
+  const riskAcknowledgeRef = useRef<HTMLInputElement>(null);
 
   const scrollIntoViewOnMobile = (target: EventTarget | null) => {
     if (window.innerWidth >= 768 || !(target instanceof HTMLElement)) return;
@@ -98,6 +101,31 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
   }, []);
 
   const handleSubmit = () => {
+    if (calcQuantity <= 0) {
+      amountInputRef.current?.focus();
+      return;
+    }
+
+    if (orderType !== 'market' && (!limitPrice || parseFloat(limitPrice) <= 0)) {
+      limitPriceInputRef.current?.focus();
+      return;
+    }
+
+    if (side === 'buy' && calcTotal + fee > virtualBalance) {
+      amountInputRef.current?.focus();
+      return;
+    }
+
+    if (riskResult.hardBlock) {
+      amountInputRef.current?.focus();
+      return;
+    }
+
+    if (riskResult.warnings.length > 0 && !riskAcknowledged) {
+      riskAcknowledgeRef.current?.focus();
+      return;
+    }
+
     if (settings.trading.confirmBeforeTrade && !showConfirm) {
       setShowConfirm(true);
       return;
@@ -179,7 +207,7 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
           <button
             onClick={() => { setSide('buy'); setShowConfirm(false); }}
             className={cn(
-              'py-2.5 min-h-11 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-1.5',
+              'py-2.5 min-h-11 rounded-lg text-sm font-semibold transition-[background-color,color,box-shadow] duration-200 flex items-center justify-center gap-1.5',
               side === 'buy'
                 ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20'
                 : 'bg-nexus-elevated text-slate-400 hover:text-slate-200'
@@ -190,7 +218,7 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
           <button
             onClick={() => { setSide('sell'); setShowConfirm(false); }}
             className={cn(
-              'py-2.5 min-h-11 rounded-lg text-sm font-semibold transition-all flex items-center justify-center gap-1.5',
+              'py-2.5 min-h-11 rounded-lg text-sm font-semibold transition-[background-color,color,box-shadow] duration-200 flex items-center justify-center gap-1.5',
               side === 'sell'
                 ? 'bg-red-600 text-white shadow-lg shadow-red-500/20'
                 : 'bg-nexus-elevated text-slate-400 hover:text-slate-200'
@@ -232,10 +260,13 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
         {/* Limit/Stop Price */}
         {orderType !== 'market' && (
           <div>
-            <label className="text-[10px] text-slate-500 uppercase tracking-wider mb-1 block">
+            <label htmlFor="order-limit-price" className="text-xs text-slate-500 uppercase tracking-wider mb-1 block">
               {orderType === 'limit' ? 'Limit' : 'Stop'} Price
             </label>
             <input
+              id="order-limit-price"
+              ref={limitPriceInputRef}
+              name="limitPrice"
               type="number"
               value={limitPrice}
               onChange={e => setLimitPrice(e.target.value)}
@@ -244,6 +275,7 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
               step="any"
               inputMode="decimal"
               enterKeyHint="next"
+              aria-invalid={!limitPrice || parseFloat(limitPrice) <= 0}
               className="w-full px-3 py-2.5 rounded-lg bg-nexus-elevated border border-nexus-border text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/40 placeholder:text-slate-600"
             />
           </div>
@@ -252,34 +284,42 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
         {/* Amount */}
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="text-[10px] text-slate-500 uppercase tracking-wider">Amount</label>
+            <label htmlFor="order-amount" className="text-xs text-slate-500 uppercase tracking-wider">Amount</label>
             <div className="flex gap-1">
               <button
                 onClick={() => setAmountMode('usd')}
-                className={cn('text-[10px] px-2 py-0.5 rounded', amountMode === 'usd' ? 'bg-indigo-500/15 text-indigo-400' : 'text-slate-500')}
+                className={cn('text-xs px-2 py-0.5 rounded', amountMode === 'usd' ? 'bg-indigo-500/15 text-indigo-400' : 'text-slate-500')}
               >
                 USD
               </button>
               <button
                 onClick={() => setAmountMode('qty')}
-                className={cn('text-[10px] px-2 py-0.5 rounded', amountMode === 'qty' ? 'bg-indigo-500/15 text-indigo-400' : 'text-slate-500')}
+                className={cn('text-xs px-2 py-0.5 rounded', amountMode === 'qty' ? 'bg-indigo-500/15 text-indigo-400' : 'text-slate-500')}
               >
                 QTY
               </button>
             </div>
           </div>
           <input
+            id="order-amount"
+            ref={amountInputRef}
+            name="amount"
             type="number"
             value={amountMode === 'usd' ? amountUSD : quantity}
             onChange={e => amountMode === 'usd' ? setAmountUSD(e.target.value) : setQuantity(e.target.value)}
             onFocus={(e) => scrollIntoViewOnMobile(e.target)}
-            placeholder={amountMode === 'usd' ? 'Amount in USD' : `Quantity in ${symbol}`}
+            placeholder={amountMode === 'usd' ? '1000.00' : `0.00 ${symbol}`}
             step="any"
             min="0"
             inputMode="decimal"
             enterKeyHint={showAdvanced ? 'next' : 'done'}
+            aria-invalid={calcQuantity <= 0}
+            aria-describedby="order-amount-help"
             className="w-full px-3 py-2.5 rounded-lg bg-nexus-elevated border border-nexus-border text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/40 placeholder:text-slate-600"
           />
+          <p id="order-amount-help" className="mt-1 text-xs text-slate-500">
+            {amountMode === 'usd' ? 'Enter your position size in USD.' : `Enter units of ${symbol}.`}
+          </p>
         </div>
 
         {/* Quick Amount Buttons */}
@@ -288,14 +328,14 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
             <button
               key={amt}
               onClick={() => { setAmountMode('usd'); setAmountUSD(amt.toString()); }}
-              className="flex-1 py-1.5 rounded-md bg-nexus-elevated text-[10px] font-medium text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-colors"
+              className="flex-1 py-1.5 rounded-md bg-nexus-elevated text-xs font-medium text-slate-400 hover:text-slate-200 hover:bg-white/5 transition-colors"
             >
               ${amt >= 1000 ? `${amt / 1000}K` : amt}
             </button>
           ))}
           <button
             onClick={() => { setAmountMode('usd'); setAmountUSD(Math.floor(virtualBalance).toString()); }}
-            className="flex-1 py-1.5 rounded-md bg-nexus-elevated text-[10px] font-medium text-indigo-400 hover:bg-indigo-500/10 transition-colors"
+            className="flex-1 py-1.5 rounded-md bg-nexus-elevated text-xs font-medium text-indigo-400 hover:bg-indigo-500/10 transition-colors"
           >
             MAX
           </button>
@@ -304,7 +344,7 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
         {/* Advanced: SL/TP */}
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="text-[10px] text-slate-500 hover:text-slate-300 transition-colors"
+          className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
         >
           {showAdvanced ? '▼' : '▶'} Stop Loss / Take Profit
         </button>
@@ -312,8 +352,10 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
         {showAdvanced && (
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[10px] text-slate-500 mb-1 block">Stop Loss</label>
+              <label htmlFor="order-stop-loss" className="text-xs text-slate-500 mb-1 block">Stop Loss</label>
               <input
+                id="order-stop-loss"
+                name="stopLoss"
                 type="number"
                 value={stopLoss}
                 onChange={e => setStopLoss(e.target.value)}
@@ -326,8 +368,10 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
               />
             </div>
             <div>
-              <label className="text-[10px] text-slate-500 mb-1 block">Take Profit</label>
+              <label htmlFor="order-take-profit" className="text-xs text-slate-500 mb-1 block">Take Profit</label>
               <input
+                id="order-take-profit"
+                name="takeProfit"
                 type="number"
                 value={takeProfit}
                 onChange={e => setTakeProfit(e.target.value)}
@@ -382,7 +426,7 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
             <p className="text-xs text-amber-300 font-medium flex items-center gap-1.5">
               <AlertTriangle className="w-3.5 h-3.5" /> Confirm Paper Trade
             </p>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-xs text-slate-400">
               {side === 'buy' ? 'Buy' : 'Sell'} {calcQuantity.toFixed(4)} {symbol} at ${effectivePrice.toFixed(2)} for ${calcTotal.toFixed(2)}?
             </p>
             <div className="flex gap-2">
@@ -425,7 +469,7 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
                 <Bot className="w-3 h-3" /> AI Risk Assessment
               </span>
               <span className={cn(
-                'text-[10px] px-2 py-0.5 rounded-full font-medium',
+                'text-xs px-2 py-0.5 rounded-full font-medium',
                 aiEval.riskRating === 'low' ? 'bg-emerald-500/10 text-emerald-400' :
                 aiEval.riskRating === 'medium' ? 'bg-amber-500/10 text-amber-400' :
                 'bg-red-500/10 text-red-400'
@@ -433,19 +477,19 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
                 {aiEval.riskRating} risk
               </span>
             </div>
-            <p className="text-[10px] text-slate-400">Size: {aiEval.positionSizeAssessment.replace('_', ' ')}</p>
-            <p className="text-[10px] text-slate-400">{aiEval.diversificationImpact}</p>
+            <p className="text-xs text-slate-400">Size: {aiEval.positionSizeAssessment.replace('_', ' ')}</p>
+            <p className="text-xs text-slate-400">{aiEval.diversificationImpact}</p>
             {aiEval.suggestions.map((s, i) => (
-              <p key={i} className="text-[10px] text-slate-500 flex items-start gap-1.5">
+              <p key={i} className="text-xs text-slate-500 flex items-start gap-1.5">
                 <span className="text-violet-400">•</span> {s}
               </p>
             ))}
             {aiEval.warning && (
-              <p className="text-[10px] text-amber-400 flex items-start gap-1">
+              <p className="text-xs text-amber-400 flex items-start gap-1">
                 <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" /> {aiEval.warning}
               </p>
             )}
-            <p className="text-[9px] text-slate-600">⚠️ AI advisory only. Not financial advice.</p>
+            <p className="text-xs text-slate-600">⚠️ AI advisory only. Not financial advice.</p>
           </div>
         )}
 
@@ -453,16 +497,18 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
         {!showConfirm && (
           <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] md:bottom-0 bg-nexus-card/95 backdrop-blur-sm -mx-4 px-4 py-2 border-t border-nexus-border/60 md:mx-0 md:px-0 md:py-0 md:border-none">
             {validationError && (
-              <p className="text-[11px] text-amber-400 mb-2">{validationError}</p>
+            <p className="text-xs text-amber-400 mb-2">{validationError}</p>
             )}
             {requiresWarningAcknowledgement && (
               <div className="mb-2 rounded-lg border border-amber-500/30 bg-amber-500/10 p-2.5">
-                <p className="text-[11px] text-amber-300 mb-1.5">Risk warning:</p>
+                <p className="text-xs text-amber-300 mb-1.5">Risk warning:</p>
                 {riskResult.warnings.map((warning, index) => (
-                  <p key={index} className="text-[10px] text-amber-200/90">{warning}</p>
+                  <p key={index} className="text-xs text-amber-200/90">{warning}</p>
                 ))}
-                <label className="mt-2 flex items-start gap-2 text-[10px] text-slate-300 cursor-pointer">
+                <label htmlFor="risk-acknowledgement" className="mt-2 flex items-start gap-2 text-xs text-slate-300 cursor-pointer">
                   <input
+                    ref={riskAcknowledgeRef}
+                    id="risk-acknowledgement"
                     type="checkbox"
                     checked={riskAcknowledged}
                     onChange={(e) => setRiskAcknowledged(e.target.checked)}
@@ -476,7 +522,7 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
               onClick={handleSubmit}
               disabled={!canTrade}
               className={cn(
-                'w-full min-h-11 py-3 rounded-lg text-sm font-semibold text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed',
+                'w-full min-h-11 py-3 rounded-lg text-sm font-semibold text-white transition-[background-color,box-shadow,opacity,transform] duration-200 disabled:opacity-40 disabled:cursor-not-allowed',
                 side === 'buy'
                   ? 'bg-emerald-600 hover:bg-emerald-500 shadow-lg shadow-emerald-500/10'
                   : 'bg-red-600 hover:bg-red-500 shadow-lg shadow-red-500/10'
@@ -488,7 +534,7 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
         )}
 
         {/* Risk Disclaimer */}
-        <p className="text-[9px] text-slate-600 text-center leading-relaxed">
+        <p className="text-xs text-slate-600 text-center leading-relaxed">
           ⚠️ Paper trading only. Simulated execution with virtual funds. Not financial advice.
         </p>
       </div>

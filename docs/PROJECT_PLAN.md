@@ -2,6 +2,8 @@
 ## Master Project Plan
 
 > **📊 V1 Status: COMPLETE + V1.1 HARDENING ACTIVE** — All P0/P1 features implemented. PR quality gate, mobile E2E smoke, mobile UX polish, split-chunk build, and risk guardrails are now implemented in frontend scope.
+>
+> **🚀 Deployment Hardening Added:** Vercel security headers, live mobile smoke workflow, uptime monitor workflow, analytics/speed-insights integration, and branch-protection automation script are now in place. See `docs/DEPLOYMENT_HARDENING.md`.
 
 ---
 
@@ -17,6 +19,7 @@
 - Mobile UX: safe-area handling, 44px touch targets, better keyboard behavior on core forms, sticky trade submit on mobile.
 - Performance: route-level lazy loading and vendor split chunks (`vendor-react`, `vendor-utils`, `vendor-lightweight-charts`, `vendor-recharts`).
 - Risk controls: hybrid guardrails (hard blocks + warnings) wired in both UI pre-check and store-level enforcement.
+- Core-flow UX polish (phase wave): semantic navigation links, skip-link + landmarks, URL-shareable state (`Markets`/`Portfolio`/`Settings`), onboarding checklist card, reduced CLS via explicit image dimensions, and risk-posture header chip.
 - Backend remains deferred to V2.
 
 ---

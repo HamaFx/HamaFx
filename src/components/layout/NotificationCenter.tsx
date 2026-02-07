@@ -38,7 +38,7 @@ export default function NotificationCenter() {
           )} />
         )}
         {triggeredAlerts.length > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center px-1">
+          <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 rounded-full bg-red-600 text-white text-xs font-bold flex items-center justify-center px-1">
             {triggeredAlerts.length}
           </span>
         )}
@@ -46,8 +46,13 @@ export default function NotificationCenter() {
 
       {open && (
         <>
-          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-2 z-50 bg-nexus-card border border-nexus-border rounded-xl shadow-2xl w-80 max-h-[70vh] flex flex-col animate-fade-in">
+          <button type="button" aria-label="Close notifications panel" className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Notifications panel"
+            className="absolute right-0 top-full mt-2 z-50 bg-nexus-card border border-nexus-border rounded-xl shadow-2xl w-80 max-h-[70vh] flex flex-col animate-fade-in modal-scroll-contain"
+          >
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-nexus-border shrink-0">
               <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -58,12 +63,13 @@ export default function NotificationCenter() {
                 {triggeredAlerts.length > 0 && (
                   <button
                     onClick={clearTriggered}
-                    className="text-[10px] text-slate-500 hover:text-slate-300 px-2 py-1 rounded hover:bg-white/5"
+                    className="text-xs text-slate-500 hover:text-slate-300 px-2 py-1 rounded hover:bg-white/5"
+                    aria-label="Clear all triggered alerts"
                   >
                     Clear all
                   </button>
                 )}
-                <button onClick={() => setOpen(false)} className="p-1 hover:bg-white/5 rounded">
+                <button type="button" onClick={() => setOpen(false)} aria-label="Close notifications panel" className="p-1 hover:bg-white/5 rounded">
                   <X className="w-3.5 h-3.5 text-slate-400" />
                 </button>
               </div>
@@ -75,7 +81,7 @@ export default function NotificationCenter() {
               {triggeredAlerts.length > 0 && (
                 <div>
                   <div className="px-4 py-2 bg-nexus-elevated/50">
-                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Triggered</span>
+                    <span className="text-xs text-slate-500 uppercase tracking-wider font-medium">Triggered</span>
                   </div>
                   {triggeredAlerts.map(alert => (
                     <div key={alert.id} className="px-4 py-3 border-b border-nexus-border hover:bg-white/[0.02]">
@@ -95,7 +101,7 @@ export default function NotificationCenter() {
                               </span>
                             </p>
                             {alert.triggeredAt && (
-                              <p className="text-[10px] text-slate-500 mt-0.5 flex items-center gap-1">
+                              <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
                                 <Clock className="w-2.5 h-2.5" /> {timeAgo(alert.triggeredAt)}
                               </p>
                             )}
@@ -103,6 +109,7 @@ export default function NotificationCenter() {
                         </div>
                         <button
                           onClick={() => deleteAlert(alert.id)}
+                          aria-label={`Delete alert for ${alert.symbol}`}
                           className="p-1 rounded hover:bg-red-500/10 text-slate-600 hover:text-red-400"
                         >
                           <Trash2 className="w-3 h-3" />
@@ -117,7 +124,7 @@ export default function NotificationCenter() {
               {activeAlerts.length > 0 && (
                 <div>
                   <div className="px-4 py-2 bg-nexus-elevated/50">
-                    <span className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">Watching</span>
+                    <span className="text-xs text-slate-500 uppercase tracking-wider font-medium">Watching</span>
                   </div>
                   {activeAlerts.slice(0, 5).map(alert => (
                     <div key={alert.id} className="px-4 py-2.5 border-b border-nexus-border/50 hover:bg-white/[0.02]">
@@ -133,7 +140,7 @@ export default function NotificationCenter() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-medium">{alert.symbol}</p>
-                          <p className="text-[10px] text-slate-500 truncate">
+                          <p className="text-xs text-slate-500 truncate">
                             {alert.type.replace('_', ' ')} <span className="font-mono">
                               {alert.type === 'percent_change' ? `${alert.targetValue}%` : `$${alert.targetValue}`}
                             </span>
@@ -150,7 +157,7 @@ export default function NotificationCenter() {
                 <div className="p-6 text-center">
                   <Bell className="w-8 h-8 text-slate-600 mx-auto mb-2" />
                   <p className="text-xs text-slate-500">No notifications</p>
-                  <p className="text-[10px] text-slate-600 mt-0.5">Set up alerts to get notified</p>
+                  <p className="text-xs text-slate-600 mt-0.5">Set up alerts to get notified</p>
                 </div>
               )}
             </div>

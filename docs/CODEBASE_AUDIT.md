@@ -138,3 +138,33 @@ Date: February 7, 2026
 - `Hama Fx` for prose/documentation copy.
 - Canonical localStorage namespace now uses `hamafx_*` keys.
 - Backward compatibility is preserved via one-time migration + legacy read fallback from `nexus_*` / `nexustrade-*` keys.
+
+## 9) V1 UI/UX Core Flow Upgrades
+- Accessibility and semantics:
+- Removed viewport zoom lock and added explicit color-scheme metadata.
+- Added keyboard skip link and main landmark targeting in layout.
+- Added live-region semantics for toasts and expanded aria labeling on icon-only controls.
+- Migrated core navigation-like click targets to semantic links/cards in Dashboard, Markets, Portfolio, Asset Detail, and Watchlist.
+- Form and mobile UX:
+- Added explicit labels/ids/autocomplete wiring in auth forms.
+- Improved order-form validation feedback and focus behavior for invalid inputs.
+- Kept sticky mobile trade CTA and safe-area spacing with improved touch-target consistency.
+- Motion and interaction:
+- Replaced `transition-all` across touched core-flow files with property-scoped transitions.
+- Normalized overlay/dialog behavior with modal scroll containment in search, notifications, chat, and modal primitives.
+- Perceived performance and stability:
+- Added explicit image dimensions for key list/detail images in Dashboard, Markets, Asset Detail, Global Search, and Watchlist to reduce layout shift.
+- URL-shareable state and onboarding:
+- Added query-string state sync for `Markets`, `Portfolio`, and `Settings`:
+- `portfolioTab`, `marketsView`, `marketsAsset`, `marketsSort`, `marketsOrder`, `marketsQ`, `settingsTab`.
+- Added a first-session onboarding checklist card on Dashboard and a persistent risk-posture chip in the app header.
+
+## 10) Deployment and Operations Hardening
+- Added Vercel production headers config: `vercel.json`.
+- Added Vercel observability in app runtime: `@vercel/analytics/react`, `@vercel/speed-insights/react` in `src/main.tsx`.
+- Added uptime monitor workflow: `.github/workflows/uptime-monitor.yml` (15-minute healthcheck).
+- Added live deployed mobile smoke workflow: `.github/workflows/live-mobile-smoke.yml`.
+- Added branch protection automation script: `scripts/apply-branch-protection.sh`.
+- Added deployment setup script for domain/env bootstrap: `scripts/vercel-prod-setup.sh`.
+- Added deployment runbook: `docs/DEPLOYMENT_HARDENING.md`.
+- Limitation observed during automation: GitHub branch protection API returns `403` for current private-repo plan; enable GitHub Pro or make repo public to activate branch protection.

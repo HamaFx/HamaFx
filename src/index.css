@@ -15,6 +15,11 @@
   --color-nexus-info: #3b82f6;
 }
 
+:root {
+  color-scheme: dark;
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -172,6 +177,26 @@
 .stagger-fast > *:nth-child(8) { animation-delay: 210ms; }
 .stagger-fast > *:nth-child(n+9) { animation-delay: 240ms; }
 
+/* Screen-reader/keyboard skip link */
+.skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: -3rem;
+  z-index: 200;
+  border-radius: 0.5rem;
+  border: 1px solid #6366f1;
+  background: #1a1d2e;
+  color: #e2e8f0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0.5rem 0.75rem;
+  transition: top 0.2s ease;
+}
+
+.skip-link:focus {
+  top: 0.75rem;
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   .price-tick-up, .price-tick-down, .price-bg-up, .price-bg-down,
@@ -271,16 +296,22 @@
 }
 
 /* Mobile ergonomics */
-:root {
-  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
-}
-
 .mobile-safe-bottom {
   padding-bottom: var(--safe-area-bottom);
 }
 
 .touch-target {
   min-height: 44px;
+}
+
+.modal-scroll-contain {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.text-meta {
+  font-size: 0.75rem;
+  line-height: 1rem;
 }
 
 @media (max-width: 767px) {

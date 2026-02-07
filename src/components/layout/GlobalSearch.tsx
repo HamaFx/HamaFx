@@ -66,6 +66,7 @@ export default function GlobalSearch() {
       <button
         onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50); }}
         className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-nexus-elevated border border-nexus-border text-xs text-slate-500 hover:text-slate-300 hover:border-nexus-border transition-colors"
+        aria-label="Open global search"
       >
         <Search className="w-3.5 h-3.5" />
         <span>Search...</span>
@@ -76,6 +77,7 @@ export default function GlobalSearch() {
       <button
         onClick={() => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 50); }}
         className="sm:hidden p-2 rounded-lg hover:bg-white/5 text-slate-400"
+        aria-label="Open global search"
       >
         <Search className="w-4.5 h-4.5" />
       </button>
@@ -83,13 +85,25 @@ export default function GlobalSearch() {
       {/* Search Modal */}
       {open && (
         <>
-          <div className="fixed inset-0 bg-black/60 z-50" onClick={() => { setOpen(false); setQuery(''); }} />
+          <button
+            type="button"
+            className="fixed inset-0 bg-black/60 z-50"
+            aria-label="Close search"
+            onClick={() => { setOpen(false); setQuery(''); }}
+          />
           <div className="fixed top-[10%] left-1/2 -translate-x-1/2 z-50 w-full max-w-lg px-4">
-            <div className="bg-nexus-card border border-nexus-border rounded-xl shadow-2xl overflow-hidden animate-fade-in">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-label="Global asset search"
+              className="bg-nexus-card border border-nexus-border rounded-xl shadow-2xl overflow-hidden animate-fade-in modal-scroll-contain"
+            >
               {/* Search Input */}
               <div className="flex items-center gap-3 px-4 py-3 border-b border-nexus-border">
                 <Search className="w-4 h-4 text-slate-500 shrink-0" />
+                <label htmlFor="global-search-input" className="sr-only">Search assets</label>
                 <input
+                  id="global-search-input"
                   ref={inputRef}
                   type="text"
                   value={query}
@@ -99,7 +113,7 @@ export default function GlobalSearch() {
                   autoComplete="off"
                 />
                 {query && (
-                  <button onClick={() => setQuery('')} className="text-slate-500 hover:text-slate-300">
+                  <button type="button" onClick={() => setQuery('')} aria-label="Clear search query" className="text-slate-500 hover:text-slate-300">
                     <X className="w-3.5 h-3.5" />
                   </button>
                 )}
@@ -115,7 +129,7 @@ export default function GlobalSearch() {
                 ) : (
                   <>
                     <div className="px-4 py-1.5 bg-nexus-elevated/50">
-                      <span className="text-[10px] text-slate-500 uppercase tracking-wider font-medium">
+                      <span className="text-xs text-slate-500 uppercase tracking-wider font-medium">
                         {query ? 'Results' : 'Popular'}
                       </span>
                     </div>
@@ -123,14 +137,15 @@ export default function GlobalSearch() {
                       <button
                         key={asset.id}
                         onClick={() => handleSelect(asset.id)}
+                        aria-label={`Open ${asset.symbol} details`}
                         className="w-full flex items-center justify-between px-4 py-3 hover:bg-white/[0.03] transition-colors text-left"
                       >
                         <div className="flex items-center gap-3">
                           {asset.image ? (
-                            <img src={asset.image} alt={asset.symbol} className="w-7 h-7 rounded-full" />
+                            <img src={asset.image} alt={asset.symbol} width={28} height={28} loading="lazy" className="w-7 h-7 rounded-full" />
                           ) : (
                             <div className={cn(
-                              'w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold',
+                              'w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold',
                               asset.type === 'crypto' ? 'bg-amber-500/15 text-amber-400' : 'bg-blue-500/15 text-blue-400'
                             )}>
                               {asset.symbol.substring(0, 2)}
@@ -138,13 +153,13 @@ export default function GlobalSearch() {
                           )}
                           <div>
                             <p className="text-sm font-medium">{asset.symbol}</p>
-                            <p className="text-[10px] text-slate-500">{asset.name}</p>
+                            <p className="text-xs text-slate-500">{asset.name}</p>
                           </div>
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-mono">${formatPrice(asset.price, asset.type)}</p>
                           <p className={cn(
-                            'text-[10px] font-mono flex items-center gap-0.5 justify-end',
+                            'text-xs font-mono flex items-center gap-0.5 justify-end',
                             asset.change >= 0 ? 'text-emerald-400' : 'text-red-400'
                           )}>
                             {asset.change >= 0 ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
@@ -159,8 +174,8 @@ export default function GlobalSearch() {
 
               {/* Footer Hint */}
               <div className="px-4 py-2 border-t border-nexus-border bg-nexus-elevated/50 flex items-center justify-between">
-                <span className="text-[10px] text-slate-600">Navigate with ↑↓ · Select with ↵</span>
-                <span className="text-[10px] text-slate-600">{allAssets.length} assets</span>
+                <span className="text-xs text-slate-600">Navigate with ↑↓ · Select with ↵</span>
+                <span className="text-xs text-slate-600">{allAssets.length} assets</span>
               </div>
             </div>
           </div>

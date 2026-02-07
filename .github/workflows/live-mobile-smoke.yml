@@ -1,0 +1,48 @@
+name: Live Mobile Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 */6 * * *"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Validate required secret
+        env:
+          LIVE_BASE_URL: ${{ vars.LIVE_BASE_URL || secrets.LIVE_BASE_URL }}
+        run: |
+          if [ -z "$LIVE_BASE_URL" ]; then
+            echo "Missing required variable/secret: LIVE_BASE_URL"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run live mobile smoke suite
+        env:
+          PLAYWRIGHT_BASE_URL: ${{ vars.LIVE_BASE_URL || secrets.LIVE_BASE_URL }}
+          PW_BROWSER: chromium
+        run: npm run e2e:smoke
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-live
+          path: playwright-report
+          if-no-files-found: ignore

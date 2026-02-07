@@ -1,9 +1,9 @@
-import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   TrendingUp, TrendingDown, Bot, ArrowRight, AlertTriangle,
   DollarSign, BarChart3, Zap, Globe, Wifi, WifiOff, RefreshCw, Bell,
-  ArrowUpRight, ArrowDownRight, Eye
+  ArrowUpRight, ArrowDownRight, Eye, CheckCircle2, Circle, X
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -11,6 +11,7 @@ import { useMarketStore } from '@/stores/marketStore';
 import { usePortfolioStore } from '@/stores/portfolioStore';
 import { useWatchlistStore } from '@/stores/watchlistStore';
 import { useAlertStore } from '@/stores/alertStore';
+import { useAuthStore } from '@/stores/authStore';
 import { AnimatedPrice, AnimatedPercent } from '@/components/ui/AnimatedPrice';
 import { StaggerContainer } from '@/components/ui/PageTransition';
 import type { Asset, ForexPair } from '@/types';
@@ -75,22 +76,30 @@ function MiniSparkline({ data, positive }: { data?: number[]; positive: boolean 
 }
 
 export default function Dashboard() {
-  const navigate = useNavigate();
   const { hasGeminiKey } = useSettingsStore();
   const {
     cryptoAssets, forexPairs, isLoadingCrypto,
     wsConnected, lastCryptoUpdate, dataSource, error, fetchCrypto, fetchForex,
     startWebSocket, startForexPolling
   } = useMarketStore();
-  const { virtualBalance, positions, getTotalValue, getTotalPnL, getInvestedAmount } = usePortfolioStore();
+  const { virtualBalance, positions, tradeHistory, getTotalValue, getTotalPnL, getInvestedAmount } = usePortfolioStore();
   const { watchlists } = useWatchlistStore();
   const { alerts } = useAlertStore();
+  const { user } = useAuthStore();
+  const [onboardingDismissed, setOnboardingDismissed] = useState(() => localStorage.getItem('hamafx_onboarding_dismissed') === '1');
   const activeAlerts = alerts.filter(a => a.isActive && !a.isTriggered);
   const triggeredAlerts = alerts.filter(a => a.isTriggered);
   const portfolioValue = getTotalValue();
   const totalPnL = getTotalPnL();
   const invested = getInvestedAmount();
   const pnlPercent = totalPnL.percent;
+  const onboardingItems = useMemo(() => ([
+    { label: 'Start demo', done: !!user, href: '/login' },
+    { label: 'Place first trade', done: tradeHistory.length > 0, href: '/markets' },
+    { label: 'Create first alert', done: alerts.length > 0, href: '/alerts' },
+    { label: 'Configure AI key', done: hasGeminiKey(), href: '/settings' },
+  ]), [alerts.length, hasGeminiKey, tradeHistory.length, user]);
+  const onboardingComplete = onboardingItems.every((item) => item.done);
 
   useEffect(() => {
     document.title = 'Dashboard — HamaFX';
@@ -127,13 +136,13 @@ export default function Dashboard() {
             <span className="text-sm text-slate-400 font-medium">Portfolio Value</span>
             <div className="flex items-center gap-2">
               <span className={cn(
-                'flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full font-medium',
+                'flex items-center gap-1.5 text-xs px-2 py-0.5 rounded-full font-medium',
                 wsConnected ? 'bg-emerald-500/15 text-emerald-400 live-glow' : 'bg-slate-500/10 text-slate-500'
               )}>
                 {wsConnected ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />}
                 {wsConnected ? 'Live' : 'Polling'}
               </span>
-              <span className="text-[10px] text-slate-600 font-mono px-2 py-0.5 rounded-full bg-slate-500/10">Paper Trading</span>
+              <span className="text-xs text-slate-600 font-mono px-2 py-0.5 rounded-full bg-slate-500/10">Paper Trading</span>
             </div>
           </div>
 
@@ -195,9 +204,9 @@ export default function Dashboard() {
 
       {/* AI Setup Prompt */}
       {!hasGeminiKey() && (
-        <button
-          onClick={() => navigate('/settings')}
-          className="w-full bg-violet-500/10 border border-violet-500/20 rounded-xl p-4 flex items-center gap-4 hover:bg-violet-500/15 transition-all hover:scale-[1.005] text-left group animate-scale-in"
+        <Link
+          to="/settings"
+          className="w-full bg-violet-500/10 border border-violet-500/20 rounded-xl p-4 flex items-center gap-4 hover:bg-violet-500/15 transition-[background-color,transform] duration-200 hover:scale-[1.005] text-left group animate-scale-in"
         >
           <div className="w-10 h-10 rounded-lg bg-violet-500/20 flex items-center justify-center shrink-0 group-hover:bg-violet-500/30 transition-colors">
             <Bot className="w-5 h-5 text-violet-400" />
@@ -207,7 +216,46 @@ export default function Dashboard() {
             <p className="text-xs text-slate-400 mt-0.5">Add your free Google Gemini API key for trading signals & sentiment</p>
           </div>
           <ArrowRight className="w-4 h-4 text-violet-400 shrink-0 group-hover:translate-x-1 transition-transform" />
-        </button>
+        </Link>
+      )}
+
+      {!onboardingDismissed && !onboardingComplete && (
+        <div className="bg-nexus-card rounded-xl border border-nexus-border p-4 animate-scale-in">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-sm font-semibold">Quick Start Checklist</p>
+              <p className="text-xs text-slate-500 mt-0.5">Complete these steps to unlock the full demo experience.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                localStorage.setItem('hamafx_onboarding_dismissed', '1');
+                setOnboardingDismissed(true);
+              }}
+              className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-white/5 transition-colors"
+              aria-label="Dismiss onboarding checklist"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {onboardingItems.map((item) => (
+              <Link
+                key={item.label}
+                to={item.href}
+                className={cn(
+                  'flex items-center justify-between rounded-lg border px-3 py-2.5 transition-colors',
+                  item.done
+                    ? 'border-emerald-500/20 bg-emerald-500/5 text-emerald-300'
+                    : 'border-nexus-border bg-nexus-elevated text-slate-300 hover:bg-white/[0.03]'
+                )}
+              >
+                <span className="text-sm">{item.label}</span>
+                {item.done ? <CheckCircle2 className="w-4 h-4" /> : <Circle className="w-4 h-4 text-slate-500" />}
+              </Link>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* ═══════════ BENTO GRID ═══════════ */}
@@ -221,11 +269,11 @@ export default function Dashboard() {
             </h2>
             <div className="flex items-center gap-3">
               {lastCryptoUpdate && (
-                <span className="text-[10px] text-slate-600 font-mono">via {dataSource}</span>
+                <span className="text-xs text-slate-600 font-mono">via {dataSource}</span>
               )}
-              <button onClick={() => navigate('/markets')} className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 group">
+              <Link to="/markets" className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 group">
                 View All <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-              </button>
+              </Link>
             </div>
           </div>
 
@@ -243,14 +291,14 @@ export default function Dashboard() {
                 const assetType: 'crypto' | 'forex' = isFx ? 'forex' : 'crypto';
 
                 return (
-                  <button
+                  <Link
                     key={item.id}
-                    onClick={() => navigate(`/asset/${item.id}`)}
-                    className="w-full flex items-center justify-between px-5 py-3 hover:bg-white/[0.03] transition-all group"
+                    to={`/asset/${item.id}`}
+                    className="w-full flex items-center justify-between px-5 py-3 hover:bg-white/[0.03] transition-colors group"
                   >
                     <div className="flex items-center gap-3">
                       {'image' in item && item.image ? (
-                        <img src={item.image} alt={symbol} className="w-9 h-9 rounded-full ring-1 ring-white/5" />
+                        <img src={item.image} alt={symbol} width={36} height={36} loading="lazy" className="w-9 h-9 rounded-full ring-1 ring-white/5" />
                       ) : (
                         <div className={cn(
                           'w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold',
@@ -280,7 +328,7 @@ export default function Dashboard() {
                         </div>
                       </div>
                     </div>
-                  </button>
+                  </Link>
                 );
               })}
             </StaggerContainer>
@@ -297,23 +345,23 @@ export default function Dashboard() {
               </h3>
             </div>
             {topGainers.map(asset => (
-              <button
+              <Link
                 key={asset.id}
-                onClick={() => navigate(`/asset/${asset.id}`)}
+                to={`/asset/${asset.id}`}
                 className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/[0.02] transition-colors"
               >
                 <div className="flex items-center gap-2">
                   {asset.image ? (
-                    <img src={asset.image} alt={asset.symbol} className="w-6 h-6 rounded-full" />
+                    <img src={asset.image} alt={asset.symbol} width={24} height={24} loading="lazy" className="w-6 h-6 rounded-full" />
                   ) : (
-                    <div className="w-6 h-6 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center text-[10px] font-bold">
+                    <div className="w-6 h-6 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center text-xs font-bold">
                       {asset.symbol.substring(0, 2)}
                     </div>
                   )}
                   <span className="text-sm font-medium">{asset.symbol}</span>
                 </div>
                 <AnimatedPercent value={asset.changePercent24h} className="text-sm font-semibold" />
-              </button>
+              </Link>
             ))}
           </StaggerContainer>
 
@@ -325,23 +373,23 @@ export default function Dashboard() {
               </h3>
             </div>
             {topLosers.map(asset => (
-              <button
+              <Link
                 key={asset.id}
-                onClick={() => navigate(`/asset/${asset.id}`)}
+                to={`/asset/${asset.id}`}
                 className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/[0.02] transition-colors"
               >
                 <div className="flex items-center gap-2">
                   {asset.image ? (
-                    <img src={asset.image} alt={asset.symbol} className="w-6 h-6 rounded-full" />
+                    <img src={asset.image} alt={asset.symbol} width={24} height={24} loading="lazy" className="w-6 h-6 rounded-full" />
                   ) : (
-                    <div className="w-6 h-6 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center text-[10px] font-bold">
+                    <div className="w-6 h-6 rounded-full bg-amber-500/15 text-amber-400 flex items-center justify-center text-xs font-bold">
                       {asset.symbol.substring(0, 2)}
                     </div>
                   )}
                   <span className="text-sm font-medium">{asset.symbol}</span>
                 </div>
                 <AnimatedPercent value={asset.changePercent24h} className="text-sm font-semibold" />
-              </button>
+              </Link>
             ))}
           </StaggerContainer>
 
@@ -352,7 +400,7 @@ export default function Dashboard() {
                 <Bot className="w-3.5 h-3.5 text-violet-400" /> AI Summary
               </h2>
               <span className={cn(
-                'text-[10px] px-2 py-0.5 rounded-full font-medium',
+                'text-xs px-2 py-0.5 rounded-full font-medium',
                 hasGeminiKey() ? 'bg-violet-500/15 text-violet-400' : 'bg-slate-500/10 text-slate-500'
               )}>
                 {hasGeminiKey() ? '🤖 AI' : '📊 Auto'}
@@ -388,7 +436,7 @@ export default function Dashboard() {
               ) : (
                 <Shimmer className="h-20 w-full" />
               )}
-              <p className="text-[10px] text-slate-600 mt-3 flex items-center gap-1">
+              <p className="text-xs text-slate-600 mt-3 flex items-center gap-1">
                 <AlertTriangle className="w-3 h-3" /> Not financial advice.
               </p>
             </div>
@@ -416,9 +464,9 @@ export default function Dashboard() {
                 const confidence = Math.min(95, Math.max(30, 50 + Math.abs(asset.changePercent24h) * 5));
 
                 return (
-                  <button
+                  <Link
                     key={asset.id}
-                    onClick={() => navigate(`/asset/${asset.id}`)}
+                    to={`/asset/${asset.id}`}
                     className="w-full px-5 py-3.5 flex items-center justify-between hover:bg-white/[0.02] transition-colors group"
                   >
                     <div className="flex items-center gap-3">
@@ -431,7 +479,7 @@ export default function Dashboard() {
                         {signal}
                       </div>
                       <div className="flex items-center gap-2">
-                        {asset.image && <img src={asset.image} alt={asset.symbol} className="w-6 h-6 rounded-full" />}
+                        {asset.image && <img src={asset.image} alt={asset.symbol} width={24} height={24} loading="lazy" className="w-6 h-6 rounded-full" />}
                         <div className="text-left">
                           <p className="text-sm font-medium group-hover:text-indigo-400 transition-colors">{asset.symbol}</p>
                           <p className="text-xs text-slate-500">
@@ -452,12 +500,12 @@ export default function Dashboard() {
                       {/* Confidence bar */}
                       <div className="w-16">
                         <div className="flex items-center justify-between mb-0.5">
-                          <span className="text-[10px] text-slate-500">{confidence.toFixed(0)}%</span>
+                          <span className="text-xs text-slate-500">{confidence.toFixed(0)}%</span>
                         </div>
                         <div className="h-1.5 bg-nexus-border rounded-full overflow-hidden">
                           <div
                             className={cn(
-                              'h-full rounded-full transition-all duration-500',
+                              'h-full rounded-full transition-[width,background-color] duration-500',
                               confidence >= 70 ? 'bg-emerald-500' : confidence >= 50 ? 'bg-amber-500' : 'bg-slate-500'
                             )}
                             style={{ width: `${confidence}%` }}
@@ -465,7 +513,7 @@ export default function Dashboard() {
                         </div>
                       </div>
                     </div>
-                  </button>
+                  </Link>
                 );
               })}
             </StaggerContainer>
@@ -488,16 +536,16 @@ export default function Dashboard() {
               </div>
               <div className="p-3 space-y-2">
                 {triggeredAlerts.length > 0 && (
-                  <button
-                    onClick={() => navigate('/alerts')}
+                  <Link
+                    to="/alerts"
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400 hover:bg-amber-500/15 transition-colors"
                   >
-                    <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center animate-pulse">
+                    <span className="w-5 h-5 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center justify-center animate-pulse">
                       {triggeredAlerts.length}
                     </span>
                     alert{triggeredAlerts.length !== 1 ? 's' : ''} triggered
                     <ArrowRight className="w-3 h-3 ml-auto" />
-                  </button>
+                  </Link>
                 )}
                 {activeAlerts.length > 0 && (
                   <p className="text-xs text-slate-500 flex items-center gap-1 px-1">
@@ -518,9 +566,9 @@ export default function Dashboard() {
               </div>
               <StaggerContainer fast className="divide-y divide-nexus-border">
                 {forexPairs.slice(0, 4).map(pair => (
-                  <button
+                  <Link
                     key={pair.id}
-                    onClick={() => navigate(`/asset/${pair.id}`)}
+                    to={`/asset/${pair.id}`}
                     className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-white/[0.02] transition-colors"
                   >
                     <span className="text-sm font-medium">{pair.symbol}</span>
@@ -533,7 +581,7 @@ export default function Dashboard() {
                       />
                       <AnimatedPercent value={pair.changePercent24h} className="text-xs" />
                     </div>
-                  </button>
+                  </Link>
                 ))}
               </StaggerContainer>
             </div>
@@ -574,7 +622,7 @@ export default function Dashboard() {
               <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
               <div>
                 <p className="text-xs text-amber-400/80 font-medium">Risk Disclaimer</p>
-                <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+                <p className="text-xs text-slate-500 mt-1 leading-relaxed">
                   Paper trading only. AI signals are educational — not financial advice. Past performance ≠ future results.
                 </p>
               </div>

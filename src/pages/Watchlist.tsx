@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   Star, Plus, Trash2, TrendingUp, TrendingDown, Edit2, Check, X,
   AlertTriangle, ArrowUpRight, Layers
@@ -40,7 +40,6 @@ function MiniSparkline({ data, positive }: { data?: number[]; positive: boolean 
 }
 
 export default function WatchlistPage() {
-  const navigate = useNavigate();
   const { watchlists, createWatchlist, deleteWatchlist, renameWatchlist, removeSymbol, setActiveWatchlist, activeWatchlistId } = useWatchlistStore();
   const { cryptoAssets, forexPairs } = useMarketStore();
   const [showCreate, setShowCreate] = useState(false);
@@ -207,6 +206,7 @@ export default function WatchlistPage() {
               </button>
               <button
                 onClick={() => { setEditingId(activeWatchlist.id); setEditName(activeWatchlist.name); }}
+                aria-label="Rename watchlist"
                 className="p-1.5 rounded-lg hover:bg-white/5 text-slate-500 hover:text-slate-300"
                 title="Rename"
               >
@@ -218,6 +218,7 @@ export default function WatchlistPage() {
                     deleteWatchlist(activeWatchlist.id);
                     setActiveWatchlist(watchlists.find(w => w.id !== activeWatchlist.id)?.id || null);
                   }}
+                  aria-label="Delete watchlist"
                   className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-500 hover:text-red-400"
                   title="Delete watchlist"
                 >
@@ -252,12 +253,12 @@ export default function WatchlistPage() {
 
                 return (
                   <div key={item.symbol} className="flex items-center justify-between px-5 py-3.5 hover:bg-white/[0.02] transition-colors">
-                    <button
-                      onClick={() => navigate(`/asset/${assetId}`)}
+                    <Link
+                      to={`/asset/${assetId}`}
                       className="flex items-center gap-3 flex-1 text-left"
                     >
                       {'image' in assetData && (assetData as Asset).image ? (
-                        <img src={(assetData as Asset).image!} alt={item.symbol} className="w-8 h-8 rounded-full" />
+                        <img src={(assetData as Asset).image!} alt={item.symbol} width={32} height={32} loading="lazy" className="w-8 h-8 rounded-full" />
                       ) : (
                         <div className={cn(
                           'w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold',
@@ -270,7 +271,7 @@ export default function WatchlistPage() {
                         <p className="text-sm font-medium">{item.symbol}</p>
                         <p className="text-xs text-slate-500">{assetData.name}</p>
                       </div>
-                    </button>
+                    </Link>
                     <div className="flex items-center gap-4">
                       {'sparkline' in assetData && (
                         <MiniSparkline data={(assetData as Asset).sparkline} positive={isPositive} />
@@ -287,6 +288,7 @@ export default function WatchlistPage() {
                       </div>
                       <button
                         onClick={() => removeSymbol(activeWatchlist.id, item.symbol)}
+                        aria-label={`Remove ${item.symbol} from watchlist`}
                         className="p-1.5 rounded-lg hover:bg-red-500/10 text-slate-600 hover:text-red-400 transition-colors"
                         title="Remove"
                       >
@@ -308,7 +310,7 @@ export default function WatchlistPage() {
           <div className="relative bg-nexus-card rounded-xl border border-nexus-border w-full max-w-md max-h-[70vh] flex flex-col animate-slide-up">
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-nexus-border shrink-0">
               <h3 className="text-sm font-semibold">Add to {activeWatchlist.name}</h3>
-              <button onClick={() => { setShowAddModal(false); setSearchQuery(''); }} className="p-1 hover:bg-white/5 rounded"><X className="w-4 h-4 text-slate-400" /></button>
+              <button onClick={() => { setShowAddModal(false); setSearchQuery(''); }} aria-label="Close add asset modal" className="p-1 hover:bg-white/5 rounded"><X className="w-4 h-4 text-slate-400" /></button>
             </div>
             <div className="px-4 py-3 border-b border-nexus-border shrink-0">
               <input
@@ -334,10 +336,10 @@ export default function WatchlistPage() {
                   >
                     <div className="flex items-center gap-3">
                       {asset.image ? (
-                        <img src={asset.image} alt={asset.symbol} className="w-7 h-7 rounded-full" />
+                        <img src={asset.image} alt={asset.symbol} width={28} height={28} loading="lazy" className="w-7 h-7 rounded-full" />
                       ) : (
                         <div className={cn(
-                          'w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold',
+                          'w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold',
                           asset.type === 'crypto' ? 'bg-amber-500/15 text-amber-400' : 'bg-blue-500/15 text-blue-400'
                         )}>
                           {asset.symbol.substring(0, 2)}
@@ -345,7 +347,7 @@ export default function WatchlistPage() {
                       )}
                       <div>
                         <p className="text-sm font-medium">{asset.symbol}</p>
-                        <p className="text-[10px] text-slate-500">{asset.name}</p>
+                        <p className="text-xs text-slate-500">{asset.name}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
@@ -362,19 +364,19 @@ export default function WatchlistPage() {
 
       {/* Quick Links */}
       <div className="flex gap-3">
-        <button
-          onClick={() => navigate('/markets')}
+        <Link
+          to="/markets"
           className="flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300"
         >
           <ArrowUpRight className="w-3 h-3" /> Explore Markets
-        </button>
+        </Link>
       </div>
 
       {/* Disclaimer */}
       <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl p-3">
         <div className="flex items-start gap-2">
           <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-          <p className="text-[10px] text-slate-500 leading-relaxed">
+          <p className="text-xs text-slate-500 leading-relaxed">
             Watchlist data updates in real-time. Prices are for educational purposes only. Not financial advice.
           </p>
         </div>

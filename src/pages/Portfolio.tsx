@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Briefcase, TrendingUp, TrendingDown, BarChart3,
   Clock, X, RefreshCw, PieChart, ArrowUpRight, Shield, DollarSign, Activity,
@@ -9,6 +9,7 @@ import { cn } from '@/utils/cn';
 import { usePortfolioStore } from '@/stores/portfolioStore';
 import { useMarketStore } from '@/stores/marketStore';
 import { AnimatedPrice } from '@/components/ui/AnimatedPrice';
+import { readPortfolioUrlState, writePortfolioUrlState } from '@/utils/urlState';
 import {
   PieChart as RechartsPie, Pie, Cell, ResponsiveContainer,
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip,
@@ -30,7 +31,7 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
   if (!active || !payload || payload.length === 0) return null;
   return (
     <div className="bg-[#1a1d2e] border border-[#2d3148] rounded-xl px-3 py-2 shadow-xl">
-      <p className="text-[10px] text-slate-400 mb-1">{label}</p>
+      <p className="text-xs text-slate-400 mb-1">{label}</p>
       {payload.map((p, i) => (
         <p key={i} className="text-xs font-mono" style={{ color: p.color }}>
           {p.name}: {typeof p.value === 'number' ? (p.name === 'Drawdown' ? `${p.value.toFixed(2)}%` : `$${p.value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`) : p.value}
@@ -41,7 +42,7 @@ function ChartTooltip({ active, payload, label }: { active?: boolean; payload?: 
 }
 
 export default function Portfolio() {
-  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     virtualBalance, positions, tradeHistory, balanceHistory,
     loadPortfolio, closePosition, getTotalValue, getTotalPnL,
@@ -49,7 +50,7 @@ export default function Portfolio() {
     orders, cancelOrder,
   } = usePortfolioStore();
   const { cryptoAssets } = useMarketStore();
-  const [activeTab, setActiveTab] = useState<'positions' | 'orders' | 'history'>('positions');
+  const [activeTab, setActiveTab] = useState<'positions' | 'orders' | 'history'>(() => readPortfolioUrlState(searchParams));
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [chartView, setChartView] = useState<'equity' | 'drawdown' | 'pnl'>('equity');
   const [sortBy, setSortBy] = useState<'pnl' | 'value' | 'name'>('value');
@@ -60,6 +61,18 @@ export default function Portfolio() {
     loadPortfolio();
     snapshotBalance();
   }, [loadPortfolio, snapshotBalance]);
+
+  useEffect(() => {
+    const urlTab = readPortfolioUrlState(searchParams);
+    setActiveTab((prev) => (prev === urlTab ? prev : urlTab));
+  }, [searchParams]);
+
+  useEffect(() => {
+    const next = writePortfolioUrlState(searchParams, activeTab);
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [activeTab, searchParams, setSearchParams]);
 
   useEffect(() => {
     if (cryptoAssets.length > 0 && positions.length > 0) {
@@ -164,7 +177,7 @@ export default function Portfolio() {
           </div>
         </div>
         <button onClick={() => setShowResetConfirm(!showResetConfirm)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs text-slate-400 hover:text-slate-300 hover:bg-white/5 transition-all">
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs text-slate-400 hover:text-slate-300 hover:bg-white/5 transition-colors">
           <RefreshCw className="w-3.5 h-3.5" /> Reset
         </button>
       </div>
@@ -192,7 +205,7 @@ export default function Portfolio() {
         <div className="relative p-5 md:p-6">
           <div className="flex items-center justify-between mb-1">
             <span className="text-sm text-slate-400">Total Portfolio Value</span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 font-medium">Paper Trading</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 font-medium">Paper Trading</span>
           </div>
           <div className="flex flex-col sm:flex-row sm:items-end gap-2 sm:gap-4 mb-5">
             <AnimatedPrice
@@ -224,7 +237,7 @@ export default function Portfolio() {
               <div key={stat.label} className="flex items-center gap-2">
                 <div className={cn('p-1.5 rounded-lg bg-white/5', stat.color)}>{stat.icon}</div>
                 <div>
-                  <p className="text-[10px] text-slate-500">{stat.label}</p>
+                  <p className="text-xs text-slate-500">{stat.label}</p>
                   <p className="text-sm font-mono font-semibold">{stat.value}</p>
                 </div>
               </div>
@@ -250,7 +263,7 @@ export default function Portfolio() {
               ].map(tab => (
                 <button key={tab.id} onClick={() => setChartView(tab.id)}
                   className={cn(
-                    'px-3 py-1 rounded-md text-xs font-medium transition-all',
+                    'px-3 py-1 rounded-md text-xs font-medium transition-colors',
                     chartView === tab.id ? 'bg-indigo-500/20 text-indigo-300' : 'text-slate-500 hover:text-slate-300'
                   )}>
                   {tab.label}
@@ -375,7 +388,7 @@ export default function Portfolio() {
             <div key={stat.label} className="bg-nexus-card rounded-xl border border-nexus-border p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <span className={cn('opacity-60', stat.positive === true ? 'text-emerald-400' : stat.positive === false ? 'text-red-400' : 'text-slate-400')}>{stat.icon}</span>
-                <span className="text-[10px] text-slate-500 uppercase tracking-wider">{stat.label}</span>
+                <span className="text-xs text-slate-500 uppercase tracking-wider">{stat.label}</span>
               </div>
               <p className={cn(
                 'text-lg font-mono font-bold',
@@ -397,13 +410,13 @@ export default function Portfolio() {
           ].map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'px-4 py-2.5 min-h-11 rounded-xl text-sm font-medium transition-all flex items-center gap-2',
+                'px-4 py-2.5 min-h-11 rounded-xl text-sm font-medium transition-colors flex items-center gap-2',
                 activeTab === tab.id ? 'bg-indigo-500/15 text-indigo-300' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
               )}>
               {tab.label}
               {tab.count > 0 && (
                 <span className={cn(
-                  'text-[10px] px-1.5 py-0.5 rounded-full font-medium',
+                  'text-xs px-1.5 py-0.5 rounded-full font-medium',
                   activeTab === tab.id ? 'bg-indigo-500/20 text-indigo-300' : 'bg-white/5 text-slate-500'
                 )}>{tab.count}</span>
               )}
@@ -420,20 +433,20 @@ export default function Portfolio() {
               </div>
               <p className="text-sm text-slate-400 font-medium">No open positions</p>
               <p className="text-xs text-slate-500 mt-1">Start trading to build your portfolio</p>
-              <button onClick={() => navigate('/markets')}
+              <Link to="/markets"
                 className="mt-4 px-4 py-2 rounded-xl bg-indigo-500/20 text-indigo-300 text-sm font-medium hover:bg-indigo-500/30 transition-colors flex items-center gap-1.5">
                 <ArrowUpRight className="w-3.5 h-3.5" /> Explore Markets
-              </button>
+              </Link>
             </div>
           ) : (
             <>
               {/* Sort controls */}
               <div className="flex items-center gap-2 px-4 py-2 border-b border-nexus-border/50">
-                <span className="text-[10px] text-slate-500 uppercase tracking-wider">Sort:</span>
+                <span className="text-xs text-slate-500 uppercase tracking-wider">Sort:</span>
                 {(['value', 'pnl', 'name'] as const).map(col => (
                   <button key={col} onClick={() => toggleSort(col)}
                     className={cn(
-                      'text-[11px] px-2 py-0.5 rounded-md font-medium transition-colors',
+                      'text-xs px-2 py-0.5 rounded-md font-medium transition-colors',
                       sortBy === col ? 'bg-indigo-500/15 text-indigo-300' : 'text-slate-500 hover:text-slate-300'
                     )}>
                     {col === 'value' ? 'Value' : col === 'pnl' ? 'P&L' : 'Name'}
@@ -442,7 +455,7 @@ export default function Portfolio() {
                 ))}
                 {positions.length > 1 && (
                   <button onClick={() => positions.forEach(pos => closePosition(pos.id, pos.currentPrice))}
-                    className="ml-auto text-[11px] text-red-400/70 hover:text-red-400 transition-colors">
+                    className="ml-auto text-xs text-red-400/70 hover:text-red-400 transition-colors">
                     Close All
                   </button>
                 )}
@@ -453,7 +466,7 @@ export default function Portfolio() {
                   const pnlColor = pos.unrealizedPnL >= 0 ? 'text-emerald-400' : 'text-red-400';
                   return (
                     <div key={pos.id} className="px-4 py-3.5 flex items-center justify-between hover:bg-white/[0.015] transition-colors group">
-                      <button onClick={() => navigate(`/asset/${pos.symbol.toLowerCase()}`)} className="flex items-center gap-3 text-left min-w-0">
+                      <Link to={`/asset/${pos.symbol.toLowerCase()}`} className="flex items-center gap-3 text-left min-w-0">
                         <div className={cn(
                           'w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0',
                           pos.side === 'long'
@@ -466,17 +479,17 @@ export default function Portfolio() {
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-semibold group-hover:text-indigo-400 transition-colors">{pos.symbol}</p>
                             <span className={cn(
-                              'text-[10px] px-1.5 py-0.5 rounded font-medium uppercase',
+                              'text-xs px-1.5 py-0.5 rounded font-medium uppercase',
                               pos.side === 'long' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
                             )}>{pos.side}</span>
                           </div>
                           <p className="text-xs text-slate-500 font-mono">{pos.quantity.toFixed(4)} @ ${formatPrice(pos.entryPrice)}</p>
                         </div>
-                      </button>
+                      </Link>
                       <div className="flex items-center gap-3 sm:gap-4 shrink-0">
                         {/* Current price */}
                         <div className="text-right hidden sm:block">
-                          <p className="text-[10px] text-slate-500">Current</p>
+                          <p className="text-xs text-slate-500">Current</p>
                           <AnimatedPrice value={pos.currentPrice} prefix="$" formatter={(n) => formatPrice(n)} className="text-xs font-mono" showBgFlash />
                         </div>
                         {/* Value & P&L */}
@@ -484,11 +497,11 @@ export default function Portfolio() {
                           <p className="text-sm font-mono font-semibold">${value.toFixed(2)}</p>
                           <p className={cn('text-xs font-mono font-medium', pnlColor)}>
                             {pos.unrealizedPnL >= 0 ? '+' : ''}${pos.unrealizedPnL.toFixed(2)}
-                            <span className="text-[10px] opacity-70 ml-1">({pos.unrealizedPnLPercent.toFixed(1)}%)</span>
+                            <span className="text-xs opacity-70 ml-1">({pos.unrealizedPnLPercent.toFixed(1)}%)</span>
                           </p>
                         </div>
                         <button onClick={() => closePosition(pos.id, pos.currentPrice)}
-                          className="px-3 py-2 min-h-11 md:min-h-0 md:px-2.5 md:py-1.5 rounded-lg text-xs text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100">
+                          className="px-3 py-2 min-h-11 md:min-h-0 md:px-2.5 md:py-1.5 rounded-lg text-xs text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-[color,background-color,opacity] duration-200 opacity-100 md:opacity-0 md:group-hover:opacity-100">
                           Close
                         </button>
                       </div>
@@ -513,7 +526,7 @@ export default function Portfolio() {
                 <div key={order.id} className="px-4 py-3.5 flex items-center justify-between hover:bg-white/[0.015] transition-colors">
                   <div className="flex items-center gap-3">
                     <span className={cn(
-                      'text-[10px] px-2 py-0.5 rounded font-bold uppercase',
+                      'text-xs px-2 py-0.5 rounded font-bold uppercase',
                       order.side === 'buy' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
                     )}>{order.side}</span>
                     <div>
@@ -544,7 +557,7 @@ export default function Portfolio() {
                 <div key={trade.id} className="px-4 py-3 flex items-center justify-between hover:bg-white/[0.015] transition-colors">
                   <div className="flex items-center gap-3">
                     <span className={cn(
-                      'text-[10px] px-2 py-0.5 rounded font-bold uppercase',
+                      'text-xs px-2 py-0.5 rounded font-bold uppercase',
                       trade.side === 'buy' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
                     )}>{trade.side}</span>
                     <div>
@@ -558,7 +571,7 @@ export default function Portfolio() {
                         {trade.pnl >= 0 ? '+' : ''}${trade.pnl.toFixed(2)}
                       </p>
                     )}
-                    <p className="text-[10px] text-slate-500">
+                    <p className="text-xs text-slate-500">
                       {new Date(trade.executedAt).toLocaleDateString()} {new Date(trade.executedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
@@ -571,24 +584,24 @@ export default function Portfolio() {
 
       {/* Quick Actions */}
       <div className="flex flex-wrap items-center gap-3">
-        <button onClick={() => navigate('/markets')}
-          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 text-white text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/20 transition-all flex items-center gap-2">
+        <Link to="/markets"
+          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 text-white text-sm font-medium hover:shadow-lg hover:shadow-indigo-500/20 transition-[box-shadow,transform] duration-200 flex items-center gap-2">
           <TrendingUp className="w-4 h-4" /> Trade Now
-        </button>
-        <button onClick={() => navigate('/risk')}
-          className="px-4 py-2.5 rounded-xl bg-white/5 text-slate-300 text-sm font-medium hover:bg-white/10 transition-all flex items-center gap-2">
+        </Link>
+        <Link to="/risk"
+          className="px-4 py-2.5 rounded-xl bg-white/5 text-slate-300 text-sm font-medium hover:bg-white/10 transition-colors flex items-center gap-2">
           <Shield className="w-4 h-4" /> Risk Analysis
-        </button>
-        <button onClick={() => navigate('/backtest')}
-          className="px-4 py-2.5 rounded-xl bg-white/5 text-slate-300 text-sm font-medium hover:bg-white/10 transition-all flex items-center gap-2">
+        </Link>
+        <Link to="/backtest"
+          className="px-4 py-2.5 rounded-xl bg-white/5 text-slate-300 text-sm font-medium hover:bg-white/10 transition-colors flex items-center gap-2">
           <Activity className="w-4 h-4" /> Backtest
-        </button>
+        </Link>
       </div>
 
       {/* Disclaimer */}
       <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/5 border border-amber-500/10">
         <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-        <p className="text-[10px] text-slate-500 leading-relaxed">
+        <p className="text-xs text-slate-500 leading-relaxed">
           Paper trading only — no real money is at risk. Past performance does not guarantee future results.
         </p>
       </div>

@@ -10,13 +10,13 @@ test.describe('Mobile Trade Flow', () => {
     await page.goto('/#/asset/bitcoin');
     await expect(page.getByText(/Paper Trade — BTC/i)).toBeVisible();
 
-    await page.getByPlaceholder('Amount in USD').fill('100');
+    await page.locator('#order-amount').fill('100');
     await page.getByRole('button', { name: /Execute Buy Order/i }).click();
     await page.getByRole('button', { name: /Confirm Buy/i }).click();
 
     await page.goto('/#/portfolio');
     await expect(page.getByRole('button', { name: /Positions/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /BTC\s+long/i }).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: /BTC\s+long/i }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /^Close$/ }).first()).toBeVisible();
   });
 });

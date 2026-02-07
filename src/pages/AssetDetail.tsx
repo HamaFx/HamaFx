@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, TrendingUp, TrendingDown, Bot, BarChart3,
   AlertTriangle, RefreshCw, Clock, DollarSign,
@@ -232,11 +232,12 @@ export default function AssetDetail() {
               'p-2 rounded-lg hover:bg-white/5 transition-colors',
               asset && isInWatchlist(asset.symbol) ? 'text-amber-400' : 'text-slate-400 hover:text-amber-400'
             )}
+            aria-label={asset && isInWatchlist(asset.symbol) ? 'Remove from watchlist' : 'Add to watchlist'}
             title={asset && isInWatchlist(asset.symbol) ? 'Remove from Watchlist' : 'Add to Watchlist'}
           >
             <Star className={cn('w-4 h-4', asset && isInWatchlist(asset.symbol) && 'fill-current')} />
           </button>
-          <button className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-blue-400" title="Set Alert">
+          <button className="p-2 rounded-lg hover:bg-white/5 text-slate-400 hover:text-blue-400" aria-label="Set alert" title="Set Alert">
             <Bell className="w-4 h-4" />
           </button>
         </div>
@@ -246,7 +247,7 @@ export default function AssetDetail() {
       <div className="bg-nexus-card rounded-xl border border-nexus-border p-5">
         <div className="flex items-center gap-4 mb-3">
           {'image' in asset && asset.image ? (
-            <img src={asset.image} alt={asset.symbol} className="w-12 h-12 rounded-full" />
+            <img src={asset.image} alt={asset.symbol} width={48} height={48} className="w-12 h-12 rounded-full" />
           ) : (
             <div className={cn(
               'w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold',
@@ -285,7 +286,7 @@ export default function AssetDetail() {
             <div key={label} className="bg-nexus-elevated rounded-lg p-3">
               <div className="flex items-center gap-1.5 mb-1">
                 <Icon className="w-3 h-3 text-slate-500" />
-                <span className="text-[10px] text-slate-500 uppercase">{label}</span>
+                <span className="text-xs text-slate-500 uppercase">{label}</span>
               </div>
               <span className="text-sm font-semibold font-mono">{value}</span>
             </div>
@@ -325,7 +326,7 @@ export default function AssetDetail() {
                       key={type}
                       onClick={() => setChartType(type)}
                       className={cn(
-                        'px-2 py-1 rounded text-[10px] font-medium capitalize',
+                        'px-2 py-1 rounded text-xs font-medium capitalize',
                         chartType === type ? 'bg-nexus-card text-white' : 'text-slate-500'
                       )}
                     >
@@ -345,7 +346,7 @@ export default function AssetDetail() {
                     <>
                       <div className="fixed inset-0 z-10" onClick={() => setShowIndicatorMenu(false)} />
                       <div className="absolute right-0 top-full mt-1 z-20 bg-nexus-card border border-nexus-border rounded-lg shadow-xl p-3 min-w-[180px] animate-fade-in">
-                        <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Overlays</p>
+                        <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Overlays</p>
                         {['SMA20', 'SMA50', 'EMA20', 'BB'].map(ind => (
                           <label key={ind} className="flex items-center gap-2 py-1 text-sm text-slate-300 cursor-pointer hover:text-white">
                             <input
@@ -358,7 +359,7 @@ export default function AssetDetail() {
                           </label>
                         ))}
                         <div className="border-t border-nexus-border my-2" />
-                        <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">Sub Charts</p>
+                        <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Sub Charts</p>
                         {['RSI', 'MACD', 'STOCH'].map(ind => (
                           <label key={ind} className="flex items-center gap-2 py-1 text-sm text-slate-300 cursor-pointer hover:text-white">
                             <input
@@ -412,7 +413,7 @@ export default function AssetDetail() {
               </h2>
               <div className="flex items-center gap-2">
                 <span className={cn(
-                  'text-[10px] px-2 py-0.5 rounded-full font-medium',
+                  'text-xs px-2 py-0.5 rounded-full font-medium',
                   aiAnalysis?.source === 'gemini'
                     ? 'bg-violet-500/15 text-violet-400'
                     : 'bg-blue-500/10 text-blue-400'
@@ -422,6 +423,7 @@ export default function AssetDetail() {
                 <button
                   onClick={runAnalysis}
                   disabled={aiLoading}
+                  aria-label="Refresh analysis"
                   className="p-1 rounded hover:bg-white/5 text-slate-500 hover:text-slate-300"
                   title="Refresh analysis"
                 >
@@ -455,7 +457,7 @@ export default function AssetDetail() {
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold font-mono">{aiAnalysis.confidence.toFixed(0)}%</p>
-                      <p className="text-[10px] text-slate-500">confidence</p>
+                      <p className="text-xs text-slate-500">confidence</p>
                     </div>
                   </div>
 
@@ -463,7 +465,7 @@ export default function AssetDetail() {
                   <div className="w-full bg-nexus-elevated rounded-full h-1.5">
                     <div
                       className={cn(
-                        'h-1.5 rounded-full transition-all',
+                        'h-1.5 rounded-full transition-[width,background-color] duration-200',
                         aiAnalysis.signal === 'BUY' ? 'bg-emerald-500' :
                         aiAnalysis.signal === 'SELL' ? 'bg-red-500' :
                         'bg-amber-500'
@@ -506,25 +508,25 @@ export default function AssetDetail() {
                     <div className="grid grid-cols-2 gap-2">
                       {aiAnalysis.supportLevel && (
                         <div className="bg-nexus-elevated rounded-lg p-2.5">
-                          <p className="text-[10px] text-slate-500">Support</p>
+                          <p className="text-xs text-slate-500">Support</p>
                           <p className="text-sm font-mono text-emerald-400">${formatPrice(aiAnalysis.supportLevel, asset.assetType)}</p>
                         </div>
                       )}
                       {aiAnalysis.resistanceLevel && (
                         <div className="bg-nexus-elevated rounded-lg p-2.5">
-                          <p className="text-[10px] text-slate-500">Resistance</p>
+                          <p className="text-xs text-slate-500">Resistance</p>
                           <p className="text-sm font-mono text-red-400">${formatPrice(aiAnalysis.resistanceLevel, asset.assetType)}</p>
                         </div>
                       )}
                       {aiAnalysis.suggestedStopLoss && (
                         <div className="bg-nexus-elevated rounded-lg p-2.5">
-                          <p className="text-[10px] text-slate-500">Stop Loss</p>
+                          <p className="text-xs text-slate-500">Stop Loss</p>
                           <p className="text-sm font-mono text-red-400">${formatPrice(aiAnalysis.suggestedStopLoss, asset.assetType)}</p>
                         </div>
                       )}
                       {aiAnalysis.suggestedTakeProfit && (
                         <div className="bg-nexus-elevated rounded-lg p-2.5">
-                          <p className="text-[10px] text-slate-500">Take Profit</p>
+                          <p className="text-xs text-slate-500">Take Profit</p>
                           <p className="text-sm font-mono text-emerald-400">${formatPrice(aiAnalysis.suggestedTakeProfit, asset.assetType)}</p>
                         </div>
                       )}
@@ -539,7 +541,7 @@ export default function AssetDetail() {
 
                   {/* AI disclaimer */}
                   <div className="bg-amber-500/5 border border-amber-500/10 rounded-lg p-2.5">
-                    <p className="text-[10px] text-amber-400/70 flex items-start gap-1.5">
+                    <p className="text-xs text-amber-400/70 flex items-start gap-1.5">
                       <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
                       {aiAnalysis.source === 'gemini'
                         ? 'AI-generated analysis (Gemini). Not financial advice. Past performance ≠ future results.'
@@ -550,12 +552,12 @@ export default function AssetDetail() {
                   {/* AI Error */}
                   {aiError && (
                     <div className="bg-red-500/5 border border-red-500/10 rounded-lg p-2.5">
-                      <p className="text-[10px] text-red-400">{aiError}</p>
+                      <p className="text-xs text-red-400">{aiError}</p>
                     </div>
                   )}
 
                   {/* Updated time */}
-                  <p className="text-[10px] text-slate-600 flex items-center gap-1">
+                  <p className="text-xs text-slate-600 flex items-center gap-1">
                     <Clock className="w-2.5 h-2.5" />
                     Updated {new Date(aiAnalysis.generatedAt).toLocaleTimeString()}
                   </p>
@@ -571,16 +573,16 @@ export default function AssetDetail() {
 
           {/* AI Setup Prompt */}
           {!hasGeminiKey() && (
-            <button
-              onClick={() => navigate('/settings')}
+            <Link
+              to="/settings"
               className="w-full bg-violet-500/10 border border-violet-500/20 rounded-xl p-4 flex items-center gap-3 hover:bg-violet-500/15 transition-colors text-left"
             >
               <Bot className="w-8 h-8 text-violet-400 shrink-0" />
               <div>
                 <p className="text-xs font-semibold text-violet-300">Upgrade to AI Analysis</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">Add your free Gemini API key for LLM-powered insights</p>
+                <p className="text-xs text-slate-400 mt-0.5">Add your free Gemini API key for LLM-powered insights</p>
               </div>
-            </button>
+            </Link>
           )}
 
           {/* Paper Trading Form */}
@@ -595,7 +597,7 @@ export default function AssetDetail() {
           <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl p-3">
             <div className="flex items-start gap-2">
               <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
-              <p className="text-[10px] text-slate-500 leading-relaxed">
+              <p className="text-xs text-slate-500 leading-relaxed">
                 Paper trading only. Signals are for educational purposes. Not financial advice. Past performance does not guarantee future results.
               </p>
             </div>

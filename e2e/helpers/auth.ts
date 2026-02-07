@@ -29,9 +29,9 @@ export async function registerViaForm(
 ): Promise<void> {
   await gotoLogin(page);
   await page.getByRole('button', { name: /^Register$/ }).click();
-  await page.getByPlaceholder('Username').fill(creds.username);
-  await page.getByPlaceholder('Email').fill(creds.email);
-  await page.getByPlaceholder('Password').fill(creds.password);
+  await page.getByLabel('Username').fill(creds.username);
+  await page.getByLabel('Email').fill(creds.email);
+  await page.getByLabel('Password').fill(creds.password);
   await page.getByRole('button', { name: /Create Account/i }).click();
   await expectDashboardLoaded(page);
 }
@@ -41,8 +41,8 @@ export async function loginViaForm(
   creds: { email: string; password: string }
 ): Promise<void> {
   await gotoLogin(page);
-  await page.getByPlaceholder('Email').fill(creds.email);
-  await page.getByPlaceholder('Password').fill(creds.password);
+  await page.getByLabel('Email').fill(creds.email);
+  await page.getByLabel('Password').fill(creds.password);
   await page.getByRole('button', { name: /Sign In/i }).click();
   await expectDashboardLoaded(page);
 }

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Search, TrendingUp, TrendingDown, Grid3X3, List, RefreshCw, Wifi, WifiOff, Zap } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useMarketStore } from '@/stores/marketStore';
 import { PremiumCard, PremiumBadge, PremiumButton, PremiumInput, TabBar, EmptyState } from '@/components/ui/Premium';
 import type { Asset, ForexPair } from '@/types';
+import { readMarketsUrlState, writeMarketsUrlState } from '@/utils/urlState';
 
 type FilterType = 'all' | 'crypto' | 'forex';
 type SortField = 'name' | 'price' | 'change' | 'volume' | 'marketCap';
@@ -86,19 +87,42 @@ function MiniSparkline({ data, positive }: { data: number[]; positive: boolean }
 }
 
 export default function Markets() {
-  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialUrlState = readMarketsUrlState(searchParams);
   const { cryptoAssets, forexPairs, isLoadingCrypto, wsConnected, dataSource, fetchCrypto, fetchForex } = useMarketStore();
-  const [filter, setFilter] = useState<FilterType>('all');
-  const [search, setSearch] = useState('');
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-  const [sortField, setSortField] = useState<SortField>('marketCap');
-  const [sortAsc, setSortAsc] = useState(false);
+  const [filter, setFilter] = useState<FilterType>(initialUrlState.asset);
+  const [search, setSearch] = useState(initialUrlState.q);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>(initialUrlState.view);
+  const [sortField, setSortField] = useState<SortField>(initialUrlState.sort);
+  const [sortAsc, setSortAsc] = useState(initialUrlState.order === 'asc');
 
   useEffect(() => {
     document.title = 'Markets — HamaFX';
     if (cryptoAssets.length === 0) fetchCrypto();
     if (forexPairs.length === 0) fetchForex();
   }, [cryptoAssets.length, forexPairs.length, fetchCrypto, fetchForex]);
+
+  useEffect(() => {
+    const urlState = readMarketsUrlState(searchParams);
+    setFilter((prev) => (prev === urlState.asset ? prev : urlState.asset));
+    setSearch((prev) => (prev === urlState.q ? prev : urlState.q));
+    setViewMode((prev) => (prev === urlState.view ? prev : urlState.view));
+    setSortField((prev) => (prev === urlState.sort ? prev : urlState.sort));
+    setSortAsc((prev) => (prev === (urlState.order === 'asc') ? prev : urlState.order === 'asc'));
+  }, [searchParams]);
+
+  useEffect(() => {
+    const next = writeMarketsUrlState(searchParams, {
+      view: viewMode,
+      asset: filter,
+      sort: sortField,
+      order: sortAsc ? 'asc' : 'desc',
+      q: search,
+    });
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [filter, search, searchParams, setSearchParams, sortAsc, sortField, viewMode]);
 
   const allRows: MarketRow[] = [...cryptoAssets.map(toMarketRow), ...forexPairs.map(forexToMarketRow)];
 
@@ -148,13 +172,24 @@ export default function Markets() {
         </div>
         <div className="flex items-center gap-2">
           <PremiumButton variant="ghost" size="sm" onClick={() => { fetchCrypto(); fetchForex(); }}
+            aria-label="Refresh market data"
             icon={<RefreshCw className={cn('w-3.5 h-3.5', isLoadingCrypto && 'animate-spin')} />}
           />
           <div className="hidden sm:flex items-center gap-0.5 bg-nexus-elevated rounded-xl p-0.5 border border-nexus-border">
-            <button onClick={() => setViewMode('list')} className={cn('p-2 rounded-lg transition-all', viewMode === 'list' ? 'bg-nexus-card text-white shadow-sm' : 'text-slate-500')}>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              aria-label="Use list view"
+              className={cn('p-2 rounded-lg transition-colors', viewMode === 'list' ? 'bg-nexus-card text-white shadow-sm' : 'text-slate-500')}
+            >
               <List className="w-4 h-4" />
             </button>
-            <button onClick={() => setViewMode('grid')} className={cn('p-2 rounded-lg transition-all', viewMode === 'grid' ? 'bg-nexus-card text-white shadow-sm' : 'text-slate-500')}>
+            <button
+              type="button"
+              onClick={() => setViewMode('grid')}
+              aria-label="Use grid view"
+              className={cn('p-2 rounded-lg transition-colors', viewMode === 'grid' ? 'bg-nexus-card text-white shadow-sm' : 'text-slate-500')}
+            >
               <Grid3X3 className="w-4 h-4" />
             </button>
           </div>
@@ -164,37 +199,37 @@ export default function Markets() {
       {/* Top Movers Strip */}
       {topGainer && topLoser && !isLoading && (
         <div className="grid grid-cols-2 gap-3">
-          <PremiumCard className="p-3 cursor-pointer card-hover" glow="emerald" onClick={() => navigate(`/asset/${topGainer.id}`)}>
+          <PremiumCard className="p-3" glow="emerald" asLink to={`/asset/${topGainer.id}`} ariaLabel={`Open ${topGainer.symbol} details`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-emerald-500/10">
                   <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
                 </div>
                 <div>
-                  <p className="text-[10px] text-slate-500 font-medium">Top Gainer</p>
+                  <p className="text-xs text-slate-500 font-medium">Top Gainer</p>
                   <p className="text-sm font-semibold">{topGainer.symbol}</p>
                 </div>
               </div>
               <div className="text-right">
                 <p className="text-sm font-mono font-bold text-emerald-400">+{topGainer.changePercent.toFixed(2)}%</p>
-                <p className="text-[10px] text-slate-500 font-mono">${formatPrice(topGainer.price, topGainer.assetType)}</p>
+                <p className="text-xs text-slate-500 font-mono">${formatPrice(topGainer.price, topGainer.assetType)}</p>
               </div>
             </div>
           </PremiumCard>
-          <PremiumCard className="p-3 cursor-pointer card-hover" glow="red" onClick={() => navigate(`/asset/${topLoser.id}`)}>
+          <PremiumCard className="p-3" glow="red" asLink to={`/asset/${topLoser.id}`} ariaLabel={`Open ${topLoser.symbol} details`}>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-red-500/10">
                   <TrendingDown className="w-3.5 h-3.5 text-red-400" />
                 </div>
                 <div>
-                  <p className="text-[10px] text-slate-500 font-medium">Top Loser</p>
+                  <p className="text-xs text-slate-500 font-medium">Top Loser</p>
                   <p className="text-sm font-semibold">{topLoser.symbol}</p>
                 </div>
               </div>
               <div className="text-right">
                 <p className="text-sm font-mono font-bold text-red-400">{topLoser.changePercent.toFixed(2)}%</p>
-                <p className="text-[10px] text-slate-500 font-mono">${formatPrice(topLoser.price, topLoser.assetType)}</p>
+                <p className="text-xs text-slate-500 font-mono">${formatPrice(topLoser.price, topLoser.assetType)}</p>
               </div>
             </div>
           </PremiumCard>
@@ -209,6 +244,7 @@ export default function Markets() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             icon={<Search className="w-4 h-4" />}
+            aria-label="Search markets"
             size="sm"
           />
         </div>
@@ -236,7 +272,7 @@ export default function Markets() {
       {!isLoading && viewMode === 'list' && (
         <PremiumCard>
           {/* Header Row */}
-          <div className="hidden sm:grid grid-cols-[2.5fr_1fr_1fr_1fr_1fr_80px] px-5 py-3 border-b border-nexus-border text-[10px] text-slate-500 font-semibold uppercase tracking-widest">
+          <div className="hidden sm:grid grid-cols-[2.5fr_1fr_1fr_1fr_1fr_80px] px-5 py-3 border-b border-nexus-border text-xs text-slate-500 font-semibold uppercase tracking-widest">
             <button onClick={() => handleSort('name')} className="text-left hover:text-slate-300 transition-colors flex items-center gap-1">
               Asset {sortField === 'name' && (sortAsc ? '↑' : '↓')}
             </button>
@@ -258,15 +294,15 @@ export default function Markets() {
           {/* Rows */}
           <div className="divide-y divide-nexus-border/50 stagger-fast">
             {filtered.map((row) => (
-              <button
+              <Link
                 key={row.id}
-                onClick={() => navigate(`/asset/${row.id}`)}
-                className="w-full grid grid-cols-2 sm:grid-cols-[2.5fr_1fr_1fr_1fr_1fr_80px] items-center px-5 py-3.5 hover:bg-white/[0.02] transition-all text-left group"
+                to={`/asset/${row.id}`}
+                className="w-full grid grid-cols-2 sm:grid-cols-[2.5fr_1fr_1fr_1fr_1fr_80px] items-center px-5 py-3.5 hover:bg-white/[0.02] transition-colors text-left group"
               >
                 {/* Asset Info */}
                 <div className="flex items-center gap-3">
                   {row.image ? (
-                    <img src={row.image} alt={row.symbol} className="w-9 h-9 rounded-full ring-1 ring-white/5" />
+                    <img src={row.image} alt={row.symbol} width={36} height={36} loading="lazy" className="w-9 h-9 rounded-full ring-1 ring-white/5" />
                   ) : (
                     <div className={cn(
                       'w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold shrink-0',
@@ -314,7 +350,7 @@ export default function Markets() {
                 <div className="hidden sm:flex justify-end">
                   {row.sparkline && <MiniSparkline data={row.sparkline} positive={row.changePercent >= 0} />}
                 </div>
-              </button>
+              </Link>
             ))}
           </div>
 
@@ -337,11 +373,13 @@ export default function Markets() {
               hover
               glow={row.changePercent >= 0 ? 'emerald' : 'red'}
               className="p-4"
-              onClick={() => navigate(`/asset/${row.id}`)}
+              asLink
+              to={`/asset/${row.id}`}
+              ariaLabel={`Open ${row.symbol} details`}
             >
               <div className="flex items-center gap-2.5 mb-3">
                 {row.image ? (
-                  <img src={row.image} alt={row.symbol} className="w-8 h-8 rounded-full ring-1 ring-white/5" />
+                  <img src={row.image} alt={row.symbol} width={32} height={32} loading="lazy" className="w-8 h-8 rounded-full ring-1 ring-white/5" />
                 ) : (
                   <div className={cn(
                     'w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold',
@@ -352,7 +390,7 @@ export default function Markets() {
                 )}
                 <div>
                   <p className="text-sm font-bold">{row.symbol}</p>
-                  <p className="text-[10px] text-slate-500 truncate max-w-[80px]">{row.name}</p>
+                  <p className="text-xs text-slate-500 truncate max-w-[80px]">{row.name}</p>
                 </div>
               </div>
 
@@ -372,7 +410,7 @@ export default function Markets() {
                 {row.changePercent >= 0 ? '+' : ''}{row.changePercent.toFixed(2)}%
               </div>
               {row.volume > 0 && (
-                <p className="text-[10px] text-slate-500 mt-1.5 font-mono">Vol: {formatVolume(row.volume)}</p>
+                <p className="text-xs text-slate-500 mt-1.5 font-mono">Vol: {formatVolume(row.volume)}</p>
               )}
             </PremiumCard>
           ))}
@@ -381,7 +419,7 @@ export default function Markets() {
 
       {/* Market Stats Bar */}
       {!isLoading && allRows.length > 0 && (
-        <div className="flex items-center justify-center gap-6 py-3 text-[10px] text-slate-600">
+        <div className="flex items-center justify-center gap-6 py-3 text-xs text-slate-600">
           <span className="flex items-center gap-1"><Zap className="w-3 h-3" /> {allRows.filter(r => r.changePercent > 0).length} gainers</span>
           <span>{allRows.filter(r => r.changePercent < 0).length} losers</span>
           <span>{wsConnected ? <Wifi className="w-3 h-3 inline text-emerald-500" /> : <WifiOff className="w-3 h-3 inline" />} {wsConnected ? 'Streaming' : 'Polling'}</span>

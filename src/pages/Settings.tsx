@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Settings as SettingsIcon, Key, User, Bell, Download, Shield,
   Bot, Newspaper, ExternalLink, AlertTriangle,
@@ -12,6 +13,7 @@ import { PremiumCard, PremiumButton, PremiumBadge, PremiumInput, PremiumToggle, 
 import type { Alert, Watchlist } from '@/types';
 import { getStorageUsageKb, safeJsonParse } from '@/utils/storage';
 import { getItemWithMigration } from '@/utils/storageMigration';
+import { readSettingsUrlState, writeSettingsUrlState } from '@/utils/urlState';
 
 type SettingsTab = 'apikeys' | 'profile' | 'preferences' | 'notifications' | 'data' | 'audit';
 const STORAGE_LIMIT_KB = 5000;
@@ -27,7 +29,8 @@ const LEGACY_WATCHLISTS_KEY = 'nexus_watchlists';
 const LEGACY_ALERTS_KEY = 'nexus_alerts';
 
 export default function Settings() {
-  const [activeTab, setActiveTab] = useState<SettingsTab>('apikeys');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<SettingsTab>(() => readSettingsUrlState(searchParams));
   const { settings, setTheme, setApiKey, removeApiKey, updateSettings } = useSettingsStore();
   const { user, auditLog } = useAuthStore();
   const [geminiKeyInput, setGeminiKeyInput] = useState('');
@@ -42,6 +45,18 @@ export default function Settings() {
     updateSettings({ trading: { ...settings.trading, ...partial } });
 
   useEffect(() => { document.title = 'Settings — HamaFX'; }, []);
+
+  useEffect(() => {
+    const urlTab = readSettingsUrlState(searchParams);
+    setActiveTab((prev) => (prev === urlTab ? prev : urlTab));
+  }, [searchParams]);
+
+  useEffect(() => {
+    const next = writeSettingsUrlState(searchParams, activeTab);
+    if (next.toString() !== searchParams.toString()) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [activeTab, searchParams, setSearchParams]);
 
   const exportUserData = () => {
     const portfolioRaw = getItemWithMigration(`${PORTFOLIO_KEY_PREFIX}${userId}`, [
@@ -147,7 +162,7 @@ export default function Settings() {
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
             className={cn(
-              'flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 rounded-lg text-xs font-medium whitespace-nowrap transition-all',
+              'flex items-center gap-1.5 px-3.5 py-2.5 min-h-11 rounded-lg text-xs font-medium whitespace-nowrap transition-colors',
               activeTab === tab.id
                 ? 'bg-nexus-card text-white shadow-sm'
                 : 'text-slate-500 hover:text-slate-300'
@@ -194,7 +209,7 @@ export default function Settings() {
                   </button>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-slate-600">Added {new Date(settings.apiKeys.gemini.addedAt).toLocaleDateString()}</span>
+                  <span className="text-xs text-slate-600">Added {new Date(settings.apiKeys.gemini.addedAt).toLocaleDateString()}</span>
                   <PremiumButton variant="ghost" size="sm" onClick={() => removeApiKey('gemini')}
                     icon={<Trash2 className="w-3 h-3" />} className="text-red-400 hover:text-red-300">
                     Remove
@@ -206,6 +221,7 @@ export default function Settings() {
                 <div className="flex gap-2">
                   <PremiumInput
                     type="password"
+                    label="Gemini API key"
                     placeholder="Paste your Gemini API key..."
                     value={geminiKeyInput}
                     onChange={e => setGeminiKeyInput(e.target.value)}
@@ -226,7 +242,7 @@ export default function Settings() {
                     <li>Click &quot;Create API Key&quot;</li>
                     <li>Copy and paste the key above</li>
                   </ol>
-                  <p className="text-[10px] text-slate-600 pt-1">Free tier: 15 requests/min, 1,500/day — plenty for personal use</p>
+                  <p className="text-xs text-slate-600 pt-1">Free tier: 15 requests/min, 1,500/day — plenty for personal use</p>
                 </PremiumCard>
               </div>
             )}
@@ -259,7 +275,7 @@ export default function Settings() {
                   <span className="text-sm text-slate-400 font-mono tracking-wider">{'•'.repeat(24) + settings.apiKeys.newsdata.key.slice(-4)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-slate-600">Added {new Date(settings.apiKeys.newsdata.addedAt).toLocaleDateString()}</span>
+                  <span className="text-xs text-slate-600">Added {new Date(settings.apiKeys.newsdata.addedAt).toLocaleDateString()}</span>
                   <PremiumButton variant="ghost" size="sm" onClick={() => removeApiKey('newsdata')}
                     icon={<Trash2 className="w-3 h-3" />} className="text-red-400">
                     Remove
@@ -270,6 +286,7 @@ export default function Settings() {
               <div className="flex gap-2">
                 <PremiumInput
                   type="password"
+                  label="NewsData API key"
                   placeholder="Paste your NewsData.io API key..."
                   value={newsKeyInput}
                   onChange={e => setNewsKeyInput(e.target.value)}
@@ -305,18 +322,18 @@ export default function Settings() {
               <p className="text-sm text-slate-400">{user?.email || 'demo@hamafx.app'}</p>
               <div className="flex items-center gap-2 mt-2">
                 <PremiumBadge variant="info" size="xs" dot>Active</PremiumBadge>
-                <span className="text-[10px] text-slate-600">Member since {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Today'}</span>
+                <span className="text-xs text-slate-600">Member since {user?.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Today'}</span>
               </div>
             </div>
           </div>
           <GlassDivider className="my-4" />
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-nexus-elevated rounded-xl p-4">
-              <p className="text-[10px] text-slate-500 mb-1">Account Type</p>
+              <p className="text-xs text-slate-500 mb-1">Account Type</p>
               <p className="text-sm font-semibold">Paper Trading</p>
             </div>
             <div className="bg-nexus-elevated rounded-xl p-4">
-              <p className="text-[10px] text-slate-500 mb-1">API Keys</p>
+              <p className="text-xs text-slate-500 mb-1">API Keys</p>
               <p className="text-sm font-semibold">{[settings.apiKeys.gemini, settings.apiKeys.newsdata].filter(k => k?.isValid).length} connected</p>
             </div>
           </div>
@@ -337,7 +354,7 @@ export default function Settings() {
                 key={value}
                 onClick={() => setTheme(value)}
                 className={cn(
-                  'flex flex-col items-center gap-2 p-5 rounded-2xl border transition-all duration-200',
+                  'flex flex-col items-center gap-2 p-5 rounded-2xl border transition-[background-color,color,border-color,box-shadow] duration-200',
                   settings.theme === value
                     ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-400 shadow-lg shadow-indigo-500/5'
                     : 'bg-nexus-elevated border-nexus-border text-slate-400 hover:text-slate-200 hover:border-slate-600'
@@ -345,7 +362,7 @@ export default function Settings() {
               >
                 <Icon className="w-6 h-6" />
                 <span className="text-sm font-semibold">{label}</span>
-                <span className="text-[10px] text-slate-500">{desc}</span>
+                <span className="text-xs text-slate-500">{desc}</span>
               </button>
             ))}
           </div>
@@ -384,7 +401,7 @@ export default function Settings() {
             />
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-500 uppercase tracking-wider">Max position size (%)</label>
+                <label className="text-xs text-slate-500 uppercase tracking-wider">Max position size (%)</label>
                 <input
                   type="number"
                   min="1"
@@ -400,7 +417,7 @@ export default function Settings() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-500 uppercase tracking-wider">Max daily loss (%)</label>
+                <label className="text-xs text-slate-500 uppercase tracking-wider">Max daily loss (%)</label>
                 <input
                   type="number"
                   min="1"
@@ -416,7 +433,7 @@ export default function Settings() {
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] text-slate-500 uppercase tracking-wider">Max open positions</label>
+                <label className="text-xs text-slate-500 uppercase tracking-wider">Max open positions</label>
                 <input
                   type="number"
                   min="1"
@@ -476,12 +493,12 @@ export default function Settings() {
             <PremiumCard glass className="p-4 cursor-pointer card-hover" onClick={exportUserData}>
               <Download className="w-5 h-5 text-indigo-400 mb-2" />
               <p className="text-sm font-semibold">Export All Data</p>
-              <p className="text-[10px] text-slate-500 mt-1">Download portfolio, trades, and settings as JSON</p>
+              <p className="text-xs text-slate-500 mt-1">Download portfolio, trades, and settings as JSON</p>
             </PremiumCard>
             <PremiumCard glass className="p-4">
               <Activity className="w-5 h-5 text-emerald-400 mb-2" />
               <p className="text-sm font-semibold">Storage Usage</p>
-              <p className="text-[10px] text-slate-500 mt-1">
+              <p className="text-xs text-slate-500 mt-1">
                 ~{storageUsageKb.toFixed(0)} KB used of {STORAGE_LIMIT_KB.toLocaleString()} KB
               </p>
               <div className="mt-2 h-1.5 bg-nexus-elevated rounded-full overflow-hidden">
@@ -509,10 +526,10 @@ export default function Settings() {
                     <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 shrink-0" />
                     <div>
                       <p className="text-sm">{entry.details}</p>
-                      <p className="text-[10px] text-slate-600">{entry.action}</p>
+                      <p className="text-xs text-slate-600">{entry.action}</p>
                     </div>
                   </div>
-                  <span className="text-[10px] text-slate-600 whitespace-nowrap ml-4 font-mono">
+                  <span className="text-xs text-slate-600 whitespace-nowrap ml-4 font-mono">
                     {new Date(entry.timestamp).toLocaleString()}
                   </span>
                 </div>

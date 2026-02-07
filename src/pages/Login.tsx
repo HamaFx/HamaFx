@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { TrendingUp, Mail, Lock, User, AlertCircle, ArrowRight, Bot, Shield, BarChart3 } from 'lucide-react';
 // cn utility available if needed
@@ -11,6 +11,9 @@ export default function Login() {
   const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const usernameRef = useRef<HTMLInputElement>(null);
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const { register, login } = useAuthStore();
 
@@ -28,7 +31,12 @@ export default function Login() {
 
     try {
       if (isRegister) {
-        if (!username.trim()) { setError('Username is required'); setLoading(false); return; }
+        if (!username.trim()) {
+          setError('Username is required');
+          setLoading(false);
+          usernameRef.current?.focus();
+          return;
+        }
         const result = await register(email, password, username);
         if (result.success) {
           navigate('/');
@@ -41,6 +49,7 @@ export default function Login() {
           navigate('/');
         } else {
           setError(result.error || 'Login failed');
+          emailRef.current?.focus();
         }
       }
     } catch {
@@ -93,7 +102,7 @@ export default function Login() {
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+            <div id="auth-error" className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
               <AlertCircle className="w-4 h-4 shrink-0" />
               {error}
             </div>
@@ -101,54 +110,79 @@ export default function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             {isRegister && (
+              <div>
+                <label htmlFor="auth-username" className="mb-1.5 block text-xs text-slate-400">Username</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input
+                    ref={usernameRef}
+                    id="auth-username"
+                    name="username"
+                    type="text"
+                    placeholder="trader_01"
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    onFocus={(e) => scrollIntoViewOnMobile(e.target)}
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    aria-describedby={error ? 'auth-error' : undefined}
+                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-nexus-elevated border border-nexus-border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 placeholder:text-slate-600"
+                    enterKeyHint="next"
+                    required
+                  />
+                </div>
+              </div>
+            )}
+            <div>
+              <label htmlFor="auth-email" className="mb-1.5 block text-xs text-slate-400">Email</label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                 <input
-                  type="text"
-                  placeholder="Username"
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
+                  ref={emailRef}
+                  id="auth-email"
+                  name="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
                   onFocus={(e) => scrollIntoViewOnMobile(e.target)}
                   className="w-full pl-10 pr-4 py-3 rounded-xl bg-nexus-elevated border border-nexus-border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 placeholder:text-slate-600"
+                  inputMode="email"
+                  autoComplete="email"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  aria-describedby={error ? 'auth-error' : undefined}
                   enterKeyHint="next"
                   required
                 />
               </div>
-            )}
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                onFocus={(e) => scrollIntoViewOnMobile(e.target)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-nexus-elevated border border-nexus-border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 placeholder:text-slate-600"
-                inputMode="email"
-                autoCapitalize="off"
-                autoCorrect="off"
-                enterKeyHint="next"
-                required
-              />
             </div>
-            <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input
-                type="password"
-                placeholder="Password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                onFocus={(e) => scrollIntoViewOnMobile(e.target)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-nexus-elevated border border-nexus-border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 placeholder:text-slate-600"
-                enterKeyHint={isRegister ? 'go' : 'done'}
-                required
-                minLength={4}
-              />
+            <div>
+              <label htmlFor="auth-password" className="mb-1.5 block text-xs text-slate-400">Password</label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                <input
+                  ref={passwordRef}
+                  id="auth-password"
+                  name="password"
+                  type="password"
+                  placeholder="min 4 characters"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  onFocus={(e) => scrollIntoViewOnMobile(e.target)}
+                  className="w-full pl-10 pr-4 py-3 rounded-xl bg-nexus-elevated border border-nexus-border text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 placeholder:text-slate-600"
+                  autoComplete={isRegister ? 'new-password' : 'current-password'}
+                  aria-describedby={error ? 'auth-error' : undefined}
+                  enterKeyHint={isRegister ? 'go' : 'done'}
+                  required
+                  minLength={4}
+                />
+              </div>
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full min-h-11 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-semibold disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+              className="w-full min-h-11 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white text-sm font-semibold disabled:opacity-50 transition-[background-position,opacity,transform] duration-200 flex items-center justify-center gap-2"
             >
               {loading ? 'Please wait...' : isRegister ? 'Create Account' : 'Sign In'}
               <ArrowRight className="w-4 h-4" />
@@ -161,16 +195,17 @@ export default function Login() {
           </div>
 
           <button
+            type="button"
             onClick={handleDemoLogin}
             disabled={loading}
-            className="w-full min-h-11 py-3 rounded-xl bg-nexus-elevated border border-nexus-border text-sm font-medium text-slate-300 hover:text-white hover:border-indigo-500/30 transition-all disabled:opacity-50"
+            className="w-full min-h-11 py-3 rounded-xl bg-nexus-elevated border border-nexus-border text-sm font-medium text-slate-300 hover:text-white hover:border-indigo-500/30 transition-[color,border-color,opacity] duration-200 disabled:opacity-50"
           >
             Try Demo Account ($100K Paper Trading)
           </button>
 
           <p className="text-center text-sm text-slate-400">
             {isRegister ? 'Already have an account?' : "Don't have an account?"}{' '}
-            <button onClick={() => { setIsRegister(!isRegister); setError(''); }} className="text-indigo-400 hover:text-indigo-300 font-medium">
+            <button type="button" onClick={() => { setIsRegister(!isRegister); setError(''); }} className="text-indigo-400 hover:text-indigo-300 font-medium">
               {isRegister ? 'Sign In' : 'Register'}
             </button>
           </p>
@@ -186,12 +221,12 @@ export default function Login() {
             <div key={label} className="text-center p-3 rounded-xl bg-nexus-card/50 border border-nexus-border/50">
               <Icon className="w-5 h-5 mx-auto mb-1.5 text-indigo-400" />
               <p className="text-xs font-medium">{label}</p>
-              <p className="text-[10px] text-slate-500">{desc}</p>
+              <p className="text-xs text-slate-500">{desc}</p>
             </div>
           ))}
         </div>
 
-        <p className="text-center text-[10px] text-slate-600 leading-relaxed">
+        <p className="text-center text-xs text-slate-600 leading-relaxed">
           ⚠️ Hama Fx is for educational purposes only. Not financial advice.
           <br />Paper trading uses simulated funds. All data stored locally.
         </p>

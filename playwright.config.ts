@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const isCI = !!process.env.CI;
+const liveBaseUrl = process.env.PLAYWRIGHT_BASE_URL;
 const localBrowser = process.env.PW_BROWSER ?? 'chromium';
 const browserName = (isCI ? 'webkit' : localBrowser) as 'chromium' | 'webkit' | 'firefox';
 const projectName = browserName === 'webkit' ? 'mobile-safari' : `mobile-${browserName}`;
@@ -18,17 +19,19 @@ export default defineConfig({
     ? [['github'], ['html', { open: 'never' }]]
     : [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://127.0.0.1:5173',
+    baseURL: liveBaseUrl || 'http://127.0.0.1:5173',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
   },
-  webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 5173',
-    url: 'http://127.0.0.1:5173',
-    timeout: 120_000,
-    reuseExistingServer: !isCI,
-  },
+  webServer: liveBaseUrl
+    ? undefined
+    : {
+        command: 'npm run dev -- --host 127.0.0.1 --port 5173',
+        url: 'http://127.0.0.1:5173',
+        timeout: 120_000,
+        reuseExistingServer: !isCI,
+      },
   projects: [
     {
       name: projectName,

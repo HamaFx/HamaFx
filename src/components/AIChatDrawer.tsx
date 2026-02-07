@@ -120,8 +120,18 @@ export default function AIChatDrawer() {
 
   return (
     <>
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 lg:bg-black/30" onClick={toggleChat} />
-      <div className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-gray-900 border-l border-gray-700 z-50 flex flex-col animate-[slideInRight_0.3s_ease]">
+      <button
+        type="button"
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 lg:bg-black/30"
+        aria-label="Close AI chat"
+        onClick={toggleChat}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="HamaFX AI chat"
+        className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-gray-900 border-l border-gray-700 z-50 flex flex-col animate-[slideInRight_0.3s_ease] modal-scroll-contain"
+      >
         <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-900/95">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
@@ -131,7 +141,7 @@ export default function AIChatDrawer() {
               <h2 className="font-bold text-white text-sm">HamaFX AI</h2>
               <div className="flex items-center gap-1.5">
                 <div className={`w-1.5 h-1.5 rounded-full ${settings.apiKeys.gemini?.key ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-                <span className="text-[10px] text-gray-400">
+                <span className="text-xs text-gray-400">
                   {settings.apiKeys.gemini?.key ? 'Gemini Connected' : 'Local Mode'}
                 </span>
               </div>
@@ -141,13 +151,14 @@ export default function AIChatDrawer() {
             {visibleMessages.length > 0 && (
               <button
                 onClick={clearHistory}
+                aria-label="Clear chat history"
                 className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-800 rounded-lg transition-colors"
                 title="Clear chat"
               >
                 <Trash2 size={16} />
               </button>
             )}
-            <button onClick={toggleChat} className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors">
+            <button type="button" onClick={toggleChat} aria-label="Close AI chat" className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors">
               <X size={18} />
             </button>
           </div>
@@ -168,7 +179,7 @@ export default function AIChatDrawer() {
                   <div key={feature.title} className="bg-gray-800/60 border border-gray-700/50 rounded-xl p-3 text-center">
                     <feature.icon size={18} className={`${feature.color} mx-auto mb-1.5`} />
                     <div className="text-white text-xs font-medium">{feature.title}</div>
-                    <div className="text-gray-500 text-[10px] mt-0.5">{feature.desc}</div>
+                    <div className="text-gray-500 text-xs mt-0.5">{feature.desc}</div>
                   </div>
                 ))}
               </div>
@@ -178,7 +189,7 @@ export default function AIChatDrawer() {
                   <button
                     key={prompt}
                     onClick={() => sendMessage(prompt)}
-                    className="w-full text-left px-3 py-2 bg-gray-800/40 hover:bg-gray-700/60 border border-gray-700/30 hover:border-indigo-500/30 rounded-lg text-sm text-gray-300 hover:text-white transition-all"
+                    className="w-full text-left px-3 py-2 bg-gray-800/40 hover:bg-gray-700/60 border border-gray-700/30 hover:border-indigo-500/30 rounded-lg text-sm text-gray-300 hover:text-white transition-[background-color,border-color,color] duration-200"
                   >
                     <MessageSquare size={12} className="inline mr-2 text-indigo-400" />
                     {prompt}
@@ -209,12 +220,13 @@ export default function AIChatDrawer() {
                         <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                       </div>
                       <div className="flex items-center gap-2 mt-1 px-1">
-                        <span className="text-[10px] text-gray-600">
+                        <span className="text-xs text-gray-600">
                           {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                         {msg.role === 'assistant' && msg.content && (
                           <button
                             onClick={() => copyMessage(msg.id, msg.content)}
+                            aria-label="Copy assistant message"
                             className="text-gray-600 hover:text-gray-300 transition-colors"
                             title="Copy message"
                           >
@@ -228,7 +240,7 @@ export default function AIChatDrawer() {
                             <button
                               key={suggestion}
                               onClick={() => sendMessage(suggestion)}
-                              className="text-xs px-2.5 py-1 bg-gray-800/60 hover:bg-indigo-600/20 border border-gray-700/40 hover:border-indigo-500/40 rounded-full text-gray-400 hover:text-indigo-300 transition-all"
+                              className="text-xs px-2.5 py-1 bg-gray-800/60 hover:bg-indigo-600/20 border border-gray-700/40 hover:border-indigo-500/40 rounded-full text-gray-400 hover:text-indigo-300 transition-[background-color,border-color,color] duration-200"
                             >
                               {suggestion}
                             </button>
@@ -268,6 +280,7 @@ export default function AIChatDrawer() {
             <input
               ref={inputRef}
               type="text"
+              aria-label="Chat message input"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage(input)}
@@ -278,12 +291,13 @@ export default function AIChatDrawer() {
             <button
               onClick={() => sendMessage(input)}
               disabled={!input.trim() || isLoading}
-              className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl text-white transition-all"
+              aria-label="Send chat message"
+              className="px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl text-white transition-[background-position,opacity,transform] duration-200"
             >
               <Send size={16} />
             </button>
           </div>
-          <p className="text-[10px] text-gray-600 text-center mt-2">
+          <p className="text-xs text-gray-600 text-center mt-2">
             AI can make mistakes. Not financial advice. Always do your own research.
           </p>
         </div>
