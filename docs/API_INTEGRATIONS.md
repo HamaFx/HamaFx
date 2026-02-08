@@ -63,13 +63,14 @@
 
 ## 3. AI / LLM APIs
 
-### 3.1 Google Gemini ✅ IMPLEMENTED
+### 3.1 Backend LLM Providers ✅ IMPLEMENTED
 
 | Attribute | Detail | Status |
 |-----------|--------|--------|
-| **Model** | `gemini-2.0-flash` | ✅ |
-| **Auth** | User-provided API key | ✅ |
-| **Free Tier** | 15 req/min, 1,500 req/day | ✅ Budgeted to ~8/min |
+| **Primary (recommended)** | Groq OpenAI-compatible API | ✅ |
+| **Fallback** | Gemini + Scitely | ✅ |
+| **Auth** | Server-side env vars (`GROQ_API_KEY`, `GEMINI_API_KEY`, `SCITELY_API_KEY`) | ✅ |
+| **Provider Selection** | `AI_PROVIDER=auto|groq|gemini|scitely` | ✅ |
 
 **Use Cases Implemented:**
 
@@ -79,6 +80,7 @@
 | Sentiment Analysis | ✅ | Score -100 to +100, key themes, impact assessment |
 | Trade Evaluation | ✅ | Risk rating, position size assessment, diversification |
 | AI Chat Copilot | ✅ | Conversational analysis with portfolio context |
+| AI News Briefing | ✅ | Narrative digest + actionable ideas + risk level |
 
 ### 3.2 Rule-Based Fallback Engine ✅ IMPLEMENTED
 - Multi-indicator confluence scoring (RSI + MACD + BB + SMA + Volume)

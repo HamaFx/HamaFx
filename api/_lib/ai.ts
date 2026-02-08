@@ -11,6 +11,7 @@ type JsonRecord = Record<string, unknown>;
 type MarketMood = 'risk-on' | 'risk-off' | 'mixed' | 'uncertain';
 type RiskLevel = 'low' | 'medium' | 'high';
 type OpportunityBias = 'bullish' | 'bearish' | 'neutral';
+type AiProvider = 'gemini' | 'groq' | 'scitely';
 
 export type AiOpportunity = {
   symbol: string;
@@ -84,6 +85,10 @@ export type AiNewsBrief = {
 };
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+const GROQ_CHAT_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const SCITELY_CHAT_URL = 'https://api.scitely.com/v1/chat/completions';
+const DEFAULT_GROQ_MODEL = 'llama-3.1-8b-instant';
+const DEFAULT_SCITELY_MODEL = 'qwen3-32b';
 
 const sentimentSchema = z.object({
   overallSentiment: z.number().min(-100).max(100),
@@ -161,7 +166,12 @@ function getGeminiKey(): string | null {
 }
 
 export function isAiProviderConfigured(): boolean {
-  return Boolean(getGeminiKey());
+  try {
+    const env = getEnv();
+    return Boolean(env.GEMINI_API_KEY || env.GROQ_API_KEY || env.SCITELY_API_KEY);
+  } catch {
+    return false;
+  }
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -199,17 +209,44 @@ function parseJsonBlock<T>(text: string): T {
   return JSON.parse(payload) as T;
 }
 
-async function callGeminiJson<T>(params: {
+function getProviderOrder(): AiProvider[] {
+  const env = getEnv();
+  const available = ([
+    env.GEMINI_API_KEY ? 'gemini' : null,
+    env.GROQ_API_KEY ? 'groq' : null,
+    env.SCITELY_API_KEY ? 'scitely' : null,
+  ].filter(Boolean) as AiProvider[]);
+
+  if (available.length === 0) return [];
+
+  const preferred = env.AI_PROVIDER ?? 'auto';
+  if (preferred === 'auto') return available;
+  if (!available.includes(preferred)) return available;
+  return [preferred, ...available.filter((provider) => provider !== preferred)];
+}
+
+function getProviderErrorMessage(payload: unknown, fallback: string): string {
+  if (!payload || typeof payload !== 'object') return fallback;
+  const obj = payload as JsonRecord;
+  const error = obj.error;
+  if (typeof error === 'string') return error;
+  if (error && typeof error === 'object') {
+    const nested = error as JsonRecord;
+    if (typeof nested.message === 'string') return nested.message;
+    if (typeof nested.code === 'string') return nested.code;
+  }
+  if (typeof obj.message === 'string') return obj.message;
+  return fallback;
+}
+
+async function callGeminiRaw(params: {
   systemPrompt: string;
   userPrompt: string;
-  schema: z.ZodType<T>;
   temperature?: number;
   maxOutputTokens?: number;
-}): Promise<T> {
+}): Promise<string> {
   const key = getGeminiKey();
-  if (!key) {
-    throw new Error('AI provider is not configured');
-  }
+  if (!key) throw new Error('Gemini API key is not configured');
 
   const response = await fetch(`${GEMINI_URL}?key=${key}`, {
     method: 'POST',
@@ -225,20 +262,92 @@ async function callGeminiJson<T>(params: {
     }),
   });
 
+  const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
-    const message = asString((payload as JsonRecord)?.error, `Gemini API failed (${response.status})`);
-    throw new Error(message);
+    const message = getProviderErrorMessage(payload, `Gemini API failed (${response.status})`);
+    throw new Error(`gemini: ${message}`);
   }
 
-  const payload = (await response.json()) as JsonRecord;
-  const text = asString((((payload.candidates as JsonRecord[] | undefined)?.[0]?.content as JsonRecord | undefined)?.parts as JsonRecord[] | undefined)?.[0]?.text);
-  if (!text) {
-    throw new Error('AI provider returned an empty response');
+  const candidate = ((payload as JsonRecord).candidates as JsonRecord[] | undefined)?.[0];
+  const content = (candidate?.content as JsonRecord | undefined);
+  const parts = (content?.parts as JsonRecord[] | undefined) ?? [];
+  const text = asString(parts[0]?.text);
+  if (!text) throw new Error('gemini: provider returned an empty response');
+  return text;
+}
+
+async function callOpenAiCompatRaw(
+  provider: 'groq' | 'scitely',
+  params: {
+    systemPrompt: string;
+    userPrompt: string;
+    temperature?: number;
+    maxOutputTokens?: number;
+  }
+): Promise<string> {
+  const env = getEnv();
+  const apiKey = provider === 'groq' ? env.GROQ_API_KEY : env.SCITELY_API_KEY;
+  if (!apiKey) throw new Error(`${provider}: API key is not configured`);
+
+  const model = provider === 'groq'
+    ? (env.GROQ_MODEL || DEFAULT_GROQ_MODEL)
+    : (env.SCITELY_MODEL || DEFAULT_SCITELY_MODEL);
+  const endpoint = provider === 'groq' ? GROQ_CHAT_URL : SCITELY_CHAT_URL;
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      model,
+      messages: [
+        { role: 'system', content: params.systemPrompt },
+        { role: 'user', content: params.userPrompt },
+      ],
+      temperature: params.temperature ?? 0.35,
+      max_tokens: params.maxOutputTokens ?? 1024,
+    }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = getProviderErrorMessage(payload, `${provider} API failed (${response.status})`);
+    throw new Error(`${provider}: ${message}`);
   }
 
-  const parsed = parseJsonBlock<unknown>(text);
-  return params.schema.parse(parsed);
+  const text = asString((((payload as JsonRecord).choices as JsonRecord[] | undefined)?.[0]?.message as JsonRecord | undefined)?.content);
+  if (!text) throw new Error(`${provider}: provider returned an empty response`);
+  return text;
+}
+
+async function callGeminiJson<T>(params: {
+  systemPrompt: string;
+  userPrompt: string;
+  schema: z.ZodType<T>;
+  temperature?: number;
+  maxOutputTokens?: number;
+}): Promise<T> {
+  const providers = getProviderOrder();
+  if (providers.length === 0) {
+    throw new Error('AI provider is not configured (set GEMINI_API_KEY or GROQ_API_KEY or SCITELY_API_KEY)');
+  }
+
+  let lastError: Error | null = null;
+  for (const provider of providers) {
+    try {
+      const text = provider === 'gemini'
+        ? await callGeminiRaw(params)
+        : await callOpenAiCompatRaw(provider, params);
+      const parsed = parseJsonBlock<unknown>(text);
+      return params.schema.parse(parsed);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown AI provider failure');
+    }
+  }
+
+  throw lastError ?? new Error('AI provider request failed');
 }
 
 function labelSentiment(score: number): AiSentiment['sentimentLabel'] {

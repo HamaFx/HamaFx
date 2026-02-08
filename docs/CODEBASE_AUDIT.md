@@ -221,3 +221,6 @@ Date: February 7, 2026
 - `src/components/layout/Layout.tsx` and `src/pages/Settings.tsx` now reflect backend AI-connected status.
 - Added new backend AI environment variable documentation:
 - `GEMINI_API_KEY` in `.env.example` and `docs/V2_BACKEND_SETUP.md`.
+- Added multi-provider backend fallback support:
+- `AI_PROVIDER=auto` can now fail over from Gemini quota exhaustion to Groq/Scitely when configured.
+- Added env knobs: `GROQ_API_KEY`, `GROQ_MODEL`, `SCITELY_API_KEY`, `SCITELY_MODEL`.

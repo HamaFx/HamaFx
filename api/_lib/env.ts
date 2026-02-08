@@ -10,6 +10,11 @@ const envSchema = z.object({
   NEWSDATA_API_KEY: z.string().optional(),
   COINGECKO_API_KEY: z.string().optional(),
   GEMINI_API_KEY: z.string().optional(),
+  GROQ_API_KEY: z.string().optional(),
+  GROQ_MODEL: z.string().optional(),
+  SCITELY_API_KEY: z.string().optional(),
+  SCITELY_MODEL: z.string().optional(),
+  AI_PROVIDER: z.enum(['auto', 'gemini', 'groq', 'scitely']).optional(),
   PROTECTION_BYPASS_SECRET: z.string().optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 });

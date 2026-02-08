@@ -18,7 +18,12 @@ Set these in Vercel for `Production`, `Preview`, and `Development`:
 - `CORS_ALLOWED_ORIGIN`
 - `NEWSDATA_API_KEY` (optional)
 - `COINGECKO_API_KEY` (optional)
-- `GEMINI_API_KEY` (recommended for backend AI copilot endpoints)
+- `GEMINI_API_KEY` (optional if using alternate LLM provider)
+- `GROQ_API_KEY` (recommended fallback/primary for free-tier AI)
+- `GROQ_MODEL` (optional, defaults to `llama-3.1-8b-instant`)
+- `SCITELY_API_KEY` (optional)
+- `SCITELY_MODEL` (optional, defaults to `qwen3-32b`)
+- `AI_PROVIDER` (`auto`, `gemini`, `groq`, `scitely`; recommended `auto`)
 - `PROTECTION_BYPASS_SECRET` (optional, recommended)
 - `VITE_BACKEND_MODE` (`off`, `shadow`, `on`)
 
