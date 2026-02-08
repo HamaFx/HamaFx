@@ -1,7 +1,10 @@
 import type {
   AiAnalysisResult,
+  AiCommandCenter,
   AiDashboardInsights,
   AiNewsBrief,
+  AiNewsIntel,
+  AiRuntimeStatus,
   AiSentimentResult,
   ChatAssistantResponse,
   TradeEvalResult,
@@ -66,4 +69,23 @@ export async function apiAiNewsBrief(params?: {
   if (typeof params?.limit === 'number') url.searchParams.set('limit', String(params.limit));
 
   return backendFetch<AiNewsBrief>(`${url.pathname}${url.search}`, { method: 'GET' });
+}
+
+export async function apiAiNewsIntel(params?: {
+  category?: 'all' | 'crypto' | 'forex' | 'economy' | 'general';
+  limit?: number;
+}): Promise<AiNewsIntel> {
+  const url = new URL('/api/v2/ai/news-intel', window.location.origin);
+  if (params?.category) url.searchParams.set('category', params.category);
+  if (typeof params?.limit === 'number') url.searchParams.set('limit', String(params.limit));
+
+  return backendFetch<AiNewsIntel>(`${url.pathname}${url.search}`, { method: 'GET' });
+}
+
+export async function apiAiCommandCenter(): Promise<AiCommandCenter> {
+  return backendFetch<AiCommandCenter>('/api/v2/ai/command-center', { method: 'GET' });
+}
+
+export async function apiAiStatus(): Promise<AiRuntimeStatus> {
+  return backendFetch<AiRuntimeStatus>('/api/v2/ai/status', { method: 'GET' });
 }

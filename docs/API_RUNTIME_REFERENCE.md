@@ -75,10 +75,13 @@ Frontend backend client (`src/services/backend/http.ts`) unwraps `data` automati
 
 - `POST /api/v2/ai/chat`
 - `GET /api/v2/ai/insights`
+- `GET /api/v2/ai/command-center`
 - `POST /api/v2/ai/analysis`
 - `POST /api/v2/ai/sentiment`
 - `POST /api/v2/ai/trade-eval`
 - `GET /api/v2/ai/news-brief`
+- `GET /api/v2/ai/news-intel`
+- `GET /api/v2/ai/status`
 
 ## 3.7 Auth Requirement Matrix
 
@@ -158,6 +161,7 @@ AI backend (`api/_lib/ai.ts`) tries providers in configured order.
 
 - `AI_PROVIDER=auto`: first available configured provider, then failover.
 - If no provider succeeds, endpoint uses deterministic fallback logic.
+- Runtime visibility endpoint: `GET /api/v2/ai/status`.
 
 ## 6) Security-Critical Defaults
 

@@ -1,9 +1,12 @@
 import { fail, methodNotAllowed } from '../../_lib/http.js';
 import * as analysisHandler from '../../_v2/ai/analysis.js';
 import * as chatHandler from '../../_v2/ai/chat.js';
+import * as commandCenterHandler from '../../_v2/ai/command-center.js';
 import * as insightsHandler from '../../_v2/ai/insights.js';
 import * as newsBriefHandler from '../../_v2/ai/news-brief.js';
+import * as newsIntelHandler from '../../_v2/ai/news-intel.js';
 import * as sentimentHandler from '../../_v2/ai/sentiment.js';
+import * as statusHandler from '../../_v2/ai/status.js';
 import * as tradeEvalHandler from '../../_v2/ai/trade-eval.js';
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'OPTIONS';
@@ -13,10 +16,13 @@ type HandlerModule = Partial<Record<HttpMethod, Handler>>;
 const modules: Record<string, HandlerModule> = {
   chat: chatHandler,
   insights: insightsHandler,
+  'command-center': commandCenterHandler,
   analysis: analysisHandler,
   sentiment: sentimentHandler,
   'trade-eval': tradeEvalHandler,
   'news-brief': newsBriefHandler,
+  'news-intel': newsIntelHandler,
+  status: statusHandler,
 };
 
 function getAction(request: Request): string {

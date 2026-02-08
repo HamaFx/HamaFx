@@ -18,8 +18,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { fetchNews } from '@/services/newsService';
-import { getNewsBrief, getSentimentAnalysis, isGeminiAvailable } from '@/services/gemini';
-import type { AiNewsBrief, NewsArticle, SentimentResult } from '@/types';
+import { getNewsBrief, getNewsIntel, getSentimentAnalysis, isGeminiAvailable } from '@/services/gemini';
+import type { AiNewsBrief, AiNewsIntel, NewsArticle, SentimentResult } from '@/types';
 
 type CategoryFilter = 'all' | 'crypto' | 'forex' | 'economy' | 'general';
 type SortMode = 'latest' | 'oldest' | 'bullish' | 'bearish';
@@ -91,6 +91,8 @@ export default function News() {
   const [aiSentimentLoading, setAiSentimentLoading] = useState(false);
   const [aiBrief, setAiBrief] = useState<AiNewsBrief | null>(null);
   const [aiBriefLoading, setAiBriefLoading] = useState(false);
+  const [aiIntel, setAiIntel] = useState<AiNewsIntel | null>(null);
+  const [aiIntelLoading, setAiIntelLoading] = useState(false);
 
   const loadNews = useCallback(async () => {
     setLoading(true);
@@ -144,6 +146,22 @@ export default function News() {
       console.warn('[News] AI brief failed:', error);
     }).finally(() => {
       if (active) setAiBriefLoading(false);
+    });
+    return () => {
+      active = false;
+    };
+  }, [articles.length, category]);
+
+  useEffect(() => {
+    if (articles.length === 0) return;
+    let active = true;
+    setAiIntelLoading(true);
+    void getNewsIntel(category).then((intel) => {
+      if (active) setAiIntel(intel);
+    }).catch((error) => {
+      console.warn('[News] AI intelligence failed:', error);
+    }).finally(() => {
+      if (active) setAiIntelLoading(false);
     });
     return () => {
       active = false;
@@ -291,6 +309,83 @@ export default function News() {
                   <p className="text-xs font-semibold mt-1">{aiBrief.actionableIdeas.length}</p>
                 </div>
               </div>
+            </>
+          ) : null}
+        </div>
+      )}
+
+      {(aiIntelLoading || aiIntel) && (
+        <div className="bg-gradient-to-r from-cyan-600/10 via-nexus-card to-blue-600/10 rounded-xl border border-nexus-border p-4">
+          <div className="flex items-center justify-between mb-2.5">
+            <h2 className="text-sm font-semibold flex items-center gap-2">
+              <Bot className="w-4 h-4 text-cyan-400" /> AI Narrative Engine
+            </h2>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 font-medium">
+              {aiIntel?.source === 'gemini'
+                ? '🤖 Gemini'
+                : aiIntel?.source === 'groq'
+                ? '🤖 Groq'
+                : aiIntel?.source === 'scitely'
+                ? '🤖 Scitely'
+                : '🧠 Copilot'}
+            </span>
+          </div>
+          {aiIntelLoading && !aiIntel ? (
+            <div className="space-y-2">
+              <div className="animate-shimmer-ai h-5 rounded-md" />
+              <div className="animate-shimmer-ai h-12 rounded-md" />
+            </div>
+          ) : aiIntel ? (
+            <>
+              <p className="text-sm text-slate-200 leading-relaxed">{aiIntel.narrative}</p>
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="bg-nexus-elevated/70 border border-nexus-border rounded-lg px-2.5 py-2">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wide">Regime</p>
+                  <p className={cn(
+                    'text-xs font-semibold mt-1 capitalize',
+                    aiIntel.regime === 'risk-on'
+                      ? 'text-emerald-400'
+                      : aiIntel.regime === 'risk-off'
+                      ? 'text-red-400'
+                      : 'text-amber-400'
+                  )}>
+                    {aiIntel.regime}
+                  </p>
+                </div>
+                <div className="bg-nexus-elevated/70 border border-nexus-border rounded-lg px-2.5 py-2">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wide">Sentiment</p>
+                  <p className={cn(
+                    'text-xs font-semibold mt-1',
+                    aiIntel.sentimentScore > 20 ? 'text-emerald-400' : aiIntel.sentimentScore < -20 ? 'text-red-400' : 'text-amber-400'
+                  )}>
+                    {aiIntel.sentimentScore > 0 ? '+' : ''}{aiIntel.sentimentScore}
+                  </p>
+                </div>
+                <div className="bg-nexus-elevated/70 border border-nexus-border rounded-lg px-2.5 py-2 col-span-2 sm:col-span-1">
+                  <p className="text-[10px] text-slate-500 uppercase tracking-wide">Catalysts</p>
+                  <p className="text-xs font-semibold mt-1">{aiIntel.catalysts.length}</p>
+                </div>
+              </div>
+              {aiIntel.catalysts.length > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  {aiIntel.catalysts.slice(0, 3).map((catalyst) => (
+                    <p key={catalyst} className="text-xs text-slate-300 flex items-start gap-1.5">
+                      <span className="text-cyan-400 mt-0.5">•</span>
+                      <span>{catalyst}</span>
+                    </p>
+                  ))}
+                </div>
+              )}
+              {aiIntel.riskChecklist.length > 0 && (
+                <div className="mt-3 border-t border-nexus-border pt-3 space-y-1.5">
+                  {aiIntel.riskChecklist.slice(0, 2).map((item) => (
+                    <p key={item} className="text-xs text-amber-300/90 flex items-start gap-1.5">
+                      <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                      <span>{item}</span>
+                    </p>
+                  ))}
+                </div>
+              )}
             </>
           ) : null}
         </div>

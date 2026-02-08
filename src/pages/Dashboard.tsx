@@ -13,10 +13,10 @@ import { useWatchlistStore } from '@/stores/watchlistStore';
 import { useAlertStore } from '@/stores/alertStore';
 import { useAuthStore } from '@/stores/authStore';
 import { isBackendEnabled } from '@/services/backend/config';
-import { getDashboardInsights } from '@/services/gemini';
+import { getCommandCenter, getDashboardInsights } from '@/services/gemini';
 import { AnimatedPrice, AnimatedPercent } from '@/components/ui/AnimatedPrice';
 import { StaggerContainer } from '@/components/ui/PageTransition';
-import type { AiDashboardInsights, Asset, ForexPair } from '@/types';
+import type { AiCommandCenter, AiDashboardInsights, Asset, ForexPair } from '@/types';
 
 function formatPrice(price: number, assetType: 'crypto' | 'forex') {
   if (assetType === 'forex') return price.toFixed(4);
@@ -92,6 +92,8 @@ export default function Dashboard() {
   const [onboardingDismissed, setOnboardingDismissed] = useState(() => localStorage.getItem('hamafx_onboarding_dismissed') === '1');
   const [aiInsights, setAiInsights] = useState<AiDashboardInsights | null>(null);
   const [aiInsightsLoading, setAiInsightsLoading] = useState(false);
+  const [aiCommandCenter, setAiCommandCenter] = useState<AiCommandCenter | null>(null);
+  const [aiCommandCenterLoading, setAiCommandCenterLoading] = useState(false);
   const activeAlerts = alerts.filter(a => a.isActive && !a.isTriggered);
   const triggeredAlerts = alerts.filter(a => a.isTriggered);
   const portfolioValue = getTotalValue();
@@ -105,6 +107,8 @@ export default function Dashboard() {
     { label: 'Configure AI key', done: hasGeminiKey() || backendAiReady, href: '/settings' },
   ]), [alerts.length, backendAiReady, hasGeminiKey, tradeHistory.length, user]);
   const onboardingComplete = onboardingItems.every((item) => item.done);
+  const aiCardLoading = aiInsightsLoading || aiCommandCenterLoading;
+  const aiPrimarySource = aiCommandCenter?.source ?? aiInsights?.source ?? null;
 
   useEffect(() => {
     document.title = 'Dashboard — HamaFX';
@@ -120,15 +124,29 @@ export default function Dashboard() {
     if (cryptoAssets.length === 0 && forexPairs.length === 0) return;
 
     setAiInsightsLoading(true);
-    void getDashboardInsights()
-      .then((next) => {
-        if (active) setAiInsights(next);
-      })
-      .catch((error) => {
-        console.warn('[Dashboard] AI insights unavailable:', error);
+    setAiCommandCenterLoading(true);
+
+    void Promise.allSettled([getDashboardInsights(), getCommandCenter()])
+      .then((results) => {
+        if (!active) return;
+
+        const [insightsResult, commandCenterResult] = results;
+        if (insightsResult.status === 'fulfilled') {
+          setAiInsights(insightsResult.value);
+        } else {
+          console.warn('[Dashboard] AI insights unavailable:', insightsResult.reason);
+        }
+
+        if (commandCenterResult.status === 'fulfilled') {
+          setAiCommandCenter(commandCenterResult.value);
+        } else {
+          console.warn('[Dashboard] AI command center unavailable:', commandCenterResult.reason);
+        }
       })
       .finally(() => {
-        if (active) setAiInsightsLoading(false);
+        if (!active) return;
+        setAiInsightsLoading(false);
+        setAiCommandCenterLoading(false);
       });
 
     return () => {
@@ -423,22 +441,82 @@ export default function Dashboard() {
           <div className="bg-nexus-card rounded-xl border border-nexus-border overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-nexus-border">
               <h2 className="text-xs font-semibold flex items-center gap-2">
-                <Bot className="w-3.5 h-3.5 text-violet-400" /> AI Summary
+                <Bot className="w-3.5 h-3.5 text-violet-400" /> AI Command Center
               </h2>
               <span className={cn(
                 'text-xs px-2 py-0.5 rounded-full font-medium',
-                (aiInsights?.source && aiInsights.source !== 'rule-based') || hasGeminiKey() || backendAiReady
+                (aiPrimarySource && aiPrimarySource !== 'rule-based') || hasGeminiKey() || backendAiReady
                   ? 'bg-violet-500/15 text-violet-400'
                   : 'bg-slate-500/10 text-slate-500'
               )}>
-                {aiInsights ? (aiInsights.source === 'rule-based' ? '🧠 Copilot' : '🤖 AI') : '📊 Auto'}
+                {aiPrimarySource
+                  ? (aiPrimarySource === 'rule-based' ? '🧠 Copilot' : '🤖 AI')
+                  : '📊 Auto'}
               </span>
             </div>
             <div className="p-4">
-              {aiInsightsLoading && (
+              {aiCardLoading && !aiInsights && !aiCommandCenter && (
                 <Shimmer className="h-20 w-full" />
               )}
-              {!aiInsightsLoading && aiInsights ? (
+              {!aiCardLoading && aiCommandCenter ? (
+                <>
+                  <p className="text-sm text-slate-200 leading-relaxed font-medium">{aiCommandCenter.headline}</p>
+                  <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+                    <span className={cn(
+                      'text-xs px-2 py-0.5 rounded-full font-medium capitalize',
+                      aiCommandCenter.posture === 'offensive'
+                        ? 'bg-emerald-500/10 text-emerald-400'
+                        : aiCommandCenter.posture === 'defensive'
+                        ? 'bg-red-500/10 text-red-400'
+                        : 'bg-amber-500/10 text-amber-400'
+                    )}>
+                      {aiCommandCenter.posture} posture
+                    </span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 font-medium">
+                      Confidence {aiCommandCenter.confidence.toFixed(0)}%
+                    </span>
+                  </div>
+                  {aiCommandCenter.topActions.length > 0 && (
+                    <ul className="mt-3 space-y-1.5">
+                      {aiCommandCenter.topActions.slice(0, 3).map((action) => (
+                        <li key={action} className="text-xs text-slate-300 flex items-start gap-1.5">
+                          <span className="text-indigo-400 mt-0.5">•</span>
+                          <span>{action}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {aiCommandCenter.blockers.length > 0 && (
+                    <div className="mt-3 space-y-1.5">
+                      {aiCommandCenter.blockers.slice(0, 2).map((flag) => (
+                        <p key={flag} className="text-xs text-amber-300/90 flex items-start gap-1.5">
+                          <AlertTriangle className="w-3 h-3 mt-0.5 shrink-0" />
+                          <span>{flag}</span>
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                  {aiCommandCenter.opportunities.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {aiCommandCenter.opportunities.slice(0, 3).map((idea) => (
+                        <span
+                          key={`${idea.symbol}-${idea.bias}`}
+                          className={cn(
+                            'text-[10px] px-2 py-0.5 rounded-full font-medium border',
+                            idea.bias === 'bullish'
+                              ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+                              : idea.bias === 'bearish'
+                              ? 'border-red-500/30 bg-red-500/10 text-red-300'
+                              : 'border-amber-500/30 bg-amber-500/10 text-amber-300'
+                          )}
+                        >
+                          {idea.symbol} {idea.bias}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : !aiCardLoading && aiInsights ? (
                 <>
                   <p className="text-sm text-slate-300 leading-relaxed">{aiInsights.summary}</p>
                   {aiInsights.keyDrivers.length > 0 && (

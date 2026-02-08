@@ -138,6 +138,18 @@ Execution order:
 
 Implementation: `api/_lib/ai.ts`.
 
+Core AI endpoints:
+
+- `/api/v2/ai/chat`
+- `/api/v2/ai/insights`
+- `/api/v2/ai/command-center`
+- `/api/v2/ai/analysis`
+- `/api/v2/ai/sentiment`
+- `/api/v2/ai/trade-eval`
+- `/api/v2/ai/news-brief`
+- `/api/v2/ai/news-intel`
+- `/api/v2/ai/status`
+
 ## 5.2 Frontend AI Call Path
 
 - Chat UI -> `src/components/AIChatDrawer.tsx`
@@ -173,6 +185,7 @@ Coordinator: `src/services/backend/stateSync.ts`.
 - Backend mode: `/api/v2/news` first.
 - Fallback: direct NewsData key from user settings.
 - Final fallback: curated local dataset (`src/data/curatedNews.ts`).
+- AI narrative overlays are served by `/api/v2/ai/news-brief` and `/api/v2/ai/news-intel`.
 
 ## 7) Build, Test, CI
 

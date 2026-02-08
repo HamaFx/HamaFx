@@ -22,6 +22,9 @@ Operational hardening, monitoring, and protected deployment automation.
 6. `docs/V1_BACKUP_RESTORE.md`
 V1 backup/restore reference.
 
+7. `docs/AI_VNEXT_IMPLEMENTATION_PLAN.md`
+AI architect roadmap and implementation checklist for proactive AI upgrades.
+
 ## Archived Docs
 
 Historical and superseded planning docs were moved to `docs/archive/`.
