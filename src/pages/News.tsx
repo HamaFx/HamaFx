@@ -245,7 +245,13 @@ export default function News() {
               <Bot className="w-4 h-4 text-indigo-400" /> AI News Brief
             </h2>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 font-medium">
-              {aiBrief?.source === 'gemini' ? '🤖 Gemini' : '🧠 Copilot'}
+              {aiBrief?.source === 'gemini'
+                ? '🤖 Gemini'
+                : aiBrief?.source === 'groq'
+                ? '🤖 Groq'
+                : aiBrief?.source === 'scitely'
+                ? '🤖 Scitely'
+                : '🧠 Copilot'}
             </span>
           </div>
           {aiBriefLoading && !aiBrief ? (

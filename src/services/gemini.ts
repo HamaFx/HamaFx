@@ -4,6 +4,7 @@
 import type {
   AiAnalysisResult,
   AiDashboardInsights,
+  AiModelSource,
   AiNewsBrief,
   MarketSummary,
   SentimentResult,
@@ -22,6 +23,10 @@ import {
 } from '@/services/backend/aiApi';
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+
+function isAiModelSource(source: string): source is AiModelSource {
+  return source === 'gemini' || source === 'groq' || source === 'scitely';
+}
 
 function getApiKey(): string | null {
   return useSettingsStore.getState().getGeminiKey();
@@ -86,7 +91,9 @@ export async function getDashboardInsights(): Promise<AiDashboardInsights> {
       const response = await apiAiInsights();
       const normalized: AiDashboardInsights = {
         ...response,
-        source: response.source === 'gemini' || response.source === 'rule-based' ? response.source : 'backend',
+        source: isAiModelSource(response.source) || response.source === 'rule-based'
+          ? response.source
+          : 'backend',
       };
       cacheService.set(cacheKey, normalized, 90_000);
       return normalized;
@@ -117,7 +124,9 @@ export async function getNewsBrief(category: 'all' | 'crypto' | 'forex' | 'econo
       const response = await apiAiNewsBrief({ category, limit: 16 });
       const normalized: AiNewsBrief = {
         ...response,
-        source: response.source === 'gemini' || response.source === 'keyword' ? response.source : 'backend',
+        source: isAiModelSource(response.source) || response.source === 'keyword'
+          ? response.source
+          : 'backend',
       };
       cacheService.set(cacheKey, normalized, 120_000);
       return normalized;
@@ -153,7 +162,9 @@ export async function getMarketAnalysis(
       const response = await apiAiAssetAnalysis({ assetName, assetSymbol, context });
       const normalized: AiAnalysisResult = {
         ...response,
-        source: response.source === 'gemini' ? 'gemini' : 'rule-based',
+        source: isAiModelSource(response.source) || response.source === 'rule-based'
+          ? response.source
+          : 'rule-based',
       };
       cacheService.set(cacheKey, normalized, 180_000);
       return normalized;
@@ -235,9 +246,9 @@ export async function getSentimentAnalysis(
       const response = await apiAiSentiment({ assetSymbol, headlines });
       const normalized: SentimentResult = {
         ...response,
-        source: response.source === 'gemini' || response.source === 'keyword' || response.source === 'none'
+        source: isAiModelSource(response.source) || response.source === 'keyword' || response.source === 'none'
           ? response.source
-          : 'gemini',
+          : 'keyword',
       };
       cacheService.set(cacheKey, normalized, 300_000);
       return normalized;
@@ -295,7 +306,7 @@ export async function getMarketSummary(
         marketMood: insights.marketMood,
         keyEvent: insights.keyDrivers[0] || 'No major events',
         outlook: insights.portfolioActions[0] || 'Risk-first posture remains appropriate.',
-        source: insights.source === 'gemini' ? 'gemini' : 'rule-based',
+        source: isAiModelSource(insights.source) ? insights.source : 'rule-based',
         generatedAt: insights.generatedAt,
       };
       cacheService.set(cacheKey, mapped, 90_000);
@@ -354,9 +365,12 @@ export async function callGeminiForTradeEval(params: {
   if (isBackendEnabled()) {
     try {
       const response = await apiAiTradeEval(params);
+      const source = typeof response.source === 'string' ? response.source : '';
       const normalized: TradeEvalResult = {
         ...response,
-        source: response.source === 'gemini' || response.source === 'rule-based' ? response.source : 'backend',
+        source: isAiModelSource(source) || source === 'rule-based'
+          ? source
+          : 'backend',
       };
       cacheService.set(cacheKey, normalized, 120_000);
       return normalized;

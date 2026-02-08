@@ -427,11 +427,11 @@ export default function Dashboard() {
               </h2>
               <span className={cn(
                 'text-xs px-2 py-0.5 rounded-full font-medium',
-                aiInsights?.source === 'gemini' || hasGeminiKey() || backendAiReady
+                (aiInsights?.source && aiInsights.source !== 'rule-based') || hasGeminiKey() || backendAiReady
                   ? 'bg-violet-500/15 text-violet-400'
                   : 'bg-slate-500/10 text-slate-500'
               )}>
-                {aiInsights?.source === 'gemini' ? '🤖 AI' : aiInsights ? '🧠 Copilot' : '📊 Auto'}
+                {aiInsights ? (aiInsights.source === 'rule-based' ? '🧠 Copilot' : '🤖 AI') : '📊 Auto'}
               </span>
             </div>
             <div className="p-4">

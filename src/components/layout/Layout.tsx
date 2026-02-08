@@ -227,6 +227,7 @@ export function Layout() {
                 chatOpen ? 'bg-purple-500/20 text-purple-400' : 'hover:bg-white/5 text-slate-400 hover:text-slate-200'
               )}
               aria-label={chatOpen ? 'Close AI chat' : 'Open AI chat'}
+              data-testid="desktop-ai-chat-toggle"
             >
               <MessageCircle className="w-4.5 h-4.5" />
             </button>
@@ -275,6 +276,7 @@ export function Layout() {
           onClick={toggleChat}
           className="md:hidden fixed right-4 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg shadow-purple-500/25 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform bottom-[calc(5.25rem+env(safe-area-inset-bottom))]"
           aria-label="Open AI Chat"
+          data-testid="mobile-ai-chat-toggle"
         >
           <MessageCircle className="w-6 h-6" />
         </button>

@@ -404,7 +404,7 @@ export default function AssetDetail() {
           <div className="bg-nexus-card rounded-xl border border-nexus-border overflow-hidden">
             <div className="flex items-center justify-between px-4 py-3 border-b border-nexus-border">
               <h2 className="text-sm font-semibold flex items-center gap-2">
-                {aiAnalysis?.source === 'gemini' ? (
+                {aiAnalysis?.source && aiAnalysis.source !== 'rule-based' ? (
                   <Bot className="w-4 h-4 text-violet-400" />
                 ) : (
                   <BarChart3 className="w-4 h-4 text-blue-400" />
@@ -414,11 +414,11 @@ export default function AssetDetail() {
               <div className="flex items-center gap-2">
                 <span className={cn(
                   'text-xs px-2 py-0.5 rounded-full font-medium',
-                  aiAnalysis?.source === 'gemini'
+                  aiAnalysis?.source && aiAnalysis.source !== 'rule-based'
                     ? 'bg-violet-500/15 text-violet-400'
                     : 'bg-blue-500/10 text-blue-400'
                 )}>
-                  {aiAnalysis?.source === 'gemini' ? '🤖 AI' : '📊 Algorithm'}
+                  {aiAnalysis?.source && aiAnalysis.source !== 'rule-based' ? '🤖 AI' : '📊 Algorithm'}
                 </span>
                 <button
                   onClick={runAnalysis}
@@ -543,9 +543,9 @@ export default function AssetDetail() {
                   <div className="bg-amber-500/5 border border-amber-500/10 rounded-lg p-2.5">
                     <p className="text-xs text-amber-400/70 flex items-start gap-1.5">
                       <AlertTriangle className="w-3 h-3 shrink-0 mt-0.5" />
-                      {aiAnalysis.source === 'gemini'
-                        ? 'AI-generated analysis (Gemini). Not financial advice. Past performance ≠ future results.'
-                        : 'Algorithm-based analysis. Not financial advice. Add Gemini API key for AI-powered insights.'}
+                      {aiAnalysis.source !== 'rule-based'
+                        ? `AI-generated analysis (${aiAnalysis.source.toUpperCase()}). Not financial advice. Past performance ≠ future results.`
+                        : 'Algorithm-based analysis. Not financial advice. Configure backend AI providers for model-generated insights.'}
                     </p>
                   </div>
 

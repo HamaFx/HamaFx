@@ -7,7 +7,7 @@ test.describe('Mobile Chat Drawer', () => {
     await installNetworkMocks(page);
     await loginWithDemo(page);
 
-    await page.getByLabel('Open AI Chat').click();
+    await page.getByTestId('mobile-ai-chat-toggle').click();
     await expect(page.getByText('HamaFX AI')).toBeVisible();
     await expect(page.getByPlaceholder(/Ask about markets/i)).toBeVisible();
   });

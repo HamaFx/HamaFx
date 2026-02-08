@@ -12,6 +12,7 @@ type MarketMood = 'risk-on' | 'risk-off' | 'mixed' | 'uncertain';
 type RiskLevel = 'low' | 'medium' | 'high';
 type OpportunityBias = 'bullish' | 'bearish' | 'neutral';
 type AiProvider = 'gemini' | 'groq' | 'scitely';
+type AiModelSource = AiProvider;
 
 export type AiOpportunity = {
   symbol: string;
@@ -28,7 +29,7 @@ export type AiDashboardInsights = {
   riskFlags: string[];
   opportunities: AiOpportunity[];
   generatedAt: string;
-  source: 'gemini' | 'rule-based';
+  source: AiModelSource | 'rule-based';
 };
 
 export type AiChatReply = {
@@ -36,7 +37,7 @@ export type AiChatReply = {
   followUps: string[];
   riskLevel: RiskLevel;
   generatedAt: string;
-  source: 'gemini' | 'rule-based';
+  source: AiModelSource | 'rule-based';
 };
 
 export type AiAssetAnalysis = {
@@ -50,7 +51,7 @@ export type AiAssetAnalysis = {
   suggestedTakeProfit?: number;
   timeHorizon: 'short-term' | 'medium-term' | 'long-term';
   summary: string;
-  source: 'gemini' | 'rule-based';
+  source: AiModelSource | 'rule-based';
   generatedAt: string;
 };
 
@@ -60,7 +61,7 @@ export type AiSentiment = {
   keyThemes: string[];
   impactAssessment: 'low' | 'medium' | 'high';
   reasoning: string;
-  source: 'gemini' | 'keyword' | 'none';
+  source: AiModelSource | 'keyword' | 'none';
 };
 
 export type AiTradeEvaluation = {
@@ -69,7 +70,7 @@ export type AiTradeEvaluation = {
   diversificationImpact: string;
   suggestions: string[];
   warning?: string;
-  source: 'gemini' | 'rule-based';
+  source: AiModelSource | 'rule-based';
   generatedAt: string;
 };
 
@@ -81,7 +82,7 @@ export type AiNewsBrief = {
   riskLevel: RiskLevel;
   sentimentScore: number;
   generatedAt: string;
-  source: 'gemini' | 'keyword';
+  source: AiModelSource | 'keyword';
 };
 
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
@@ -204,9 +205,29 @@ function hashKey(input: unknown): string {
 }
 
 function parseJsonBlock<T>(text: string): T {
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const payload = fenced ? fenced[1].trim() : text.trim();
-  return JSON.parse(payload) as T;
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1]?.trim();
+  const trimmed = text.trim();
+  const firstObjectStart = trimmed.indexOf('{');
+  const lastObjectEnd = trimmed.lastIndexOf('}');
+  const bracketObject =
+    firstObjectStart >= 0 && lastObjectEnd > firstObjectStart
+      ? trimmed.slice(firstObjectStart, lastObjectEnd + 1)
+      : null;
+
+  const candidates = [fenced, trimmed, bracketObject].filter(
+    (candidate): candidate is string => Boolean(candidate && candidate.length > 1)
+  );
+
+  let lastError: Error | null = null;
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate) as T;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Invalid JSON candidate');
+    }
+  }
+
+  throw new Error(`AI response was not valid JSON: ${lastError?.message ?? 'unknown parse error'}`);
 }
 
 function getProviderOrder(): AiProvider[] {
@@ -328,7 +349,7 @@ async function callGeminiJson<T>(params: {
   schema: z.ZodType<T>;
   temperature?: number;
   maxOutputTokens?: number;
-}): Promise<T> {
+}): Promise<{ data: T; provider: AiProvider }> {
   const providers = getProviderOrder();
   if (providers.length === 0) {
     throw new Error('AI provider is not configured (set GEMINI_API_KEY or GROQ_API_KEY or SCITELY_API_KEY)');
@@ -341,7 +362,10 @@ async function callGeminiJson<T>(params: {
         ? await callGeminiRaw(params)
         : await callOpenAiCompatRaw(provider, params);
       const parsed = parseJsonBlock<unknown>(text);
-      return params.schema.parse(parsed);
+      return {
+        data: params.schema.parse(parsed),
+        provider,
+      };
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Unknown AI provider failure');
     }
@@ -561,7 +585,7 @@ export async function getAiDashboardInsights(userId: string): Promise<AiDashboar
     const context = await buildAiContext(userId);
 
     try {
-      const payload = await callGeminiJson({
+      const { data, provider } = await callGeminiJson({
         schema: insightsSchema,
         systemPrompt:
           'You are HamaFX institutional-grade AI strategist. Return ONLY valid JSON. Keep risk-first language. Never promise returns. Mention paper-trading context where relevant.',
@@ -571,9 +595,9 @@ export async function getAiDashboardInsights(userId: string): Promise<AiDashboar
       });
 
       return {
-        ...payload,
+        ...data,
         generatedAt: new Date().toISOString(),
-        source: 'gemini',
+        source: provider,
       };
     } catch {
       return fallbackInsights(context);
@@ -613,7 +637,7 @@ export async function getAiChatReply(params: {
   const history = Array.isArray(params.history) ? params.history.slice(-8) : [];
 
   try {
-    const payload = await callGeminiJson({
+    const { data, provider } = await callGeminiJson({
       schema: chatSchema,
       systemPrompt:
         'You are HamaFX Copilot. Return ONLY JSON. Be concise, risk-first, educational, and grounded in provided portfolio/market context. Mention uncertainty when data is incomplete.',
@@ -623,9 +647,9 @@ export async function getAiChatReply(params: {
     });
 
     return {
-      ...payload,
+      ...data,
       generatedAt: new Date().toISOString(),
-      source: 'gemini',
+      source: provider,
     };
   } catch {
     return fallbackChatResponse(params.message, context);
@@ -668,7 +692,7 @@ export async function getAiAssetAnalysis(input: {
 
   return withRedisCache(cacheKey, 120, async () => {
     try {
-      const payload = await callGeminiJson({
+      const { data, provider } = await callGeminiJson({
         schema: analysisSchema,
         systemPrompt:
           'You are a professional market analyst for HamaFX. Return ONLY JSON. Provide balanced reasoning and explicit risk factors. Never guarantee outcomes.',
@@ -678,9 +702,9 @@ export async function getAiAssetAnalysis(input: {
       });
 
       return {
-        ...payload,
+        ...data,
         generatedAt: new Date().toISOString(),
-        source: 'gemini',
+        source: provider,
       };
     } catch {
       return fallbackAssetAnalysis(input);
@@ -707,7 +731,7 @@ export async function getAiSentiment(input: {
 
   return withRedisCache(cacheKey, 180, async () => {
     try {
-      const payload = await callGeminiJson({
+      const { data, provider } = await callGeminiJson({
         schema: sentimentSchema,
         systemPrompt:
           'You are a financial sentiment analyst. Return ONLY JSON. Base conclusions on headline tone and macro implications; keep it concise.',
@@ -717,8 +741,8 @@ export async function getAiSentiment(input: {
       });
 
       return {
-        ...payload,
-        source: 'gemini',
+        ...data,
+        source: provider,
       };
     } catch {
       const score = keywordSentimentScore(input.headlines);
@@ -751,7 +775,7 @@ export async function getAiTradeEvaluation(input: {
 
   return withRedisCache(cacheKey, 90, async () => {
     try {
-      const payload = await callGeminiJson({
+      const { data, provider } = await callGeminiJson({
         schema: tradeEvalSchema,
         systemPrompt:
           'You are a trading risk manager. Return ONLY JSON. Evaluate proposed paper trade with strict position sizing and drawdown awareness.',
@@ -761,8 +785,8 @@ export async function getAiTradeEvaluation(input: {
       });
 
       return {
-        ...payload,
-        source: 'gemini',
+        ...data,
+        source: provider,
         generatedAt: new Date().toISOString(),
       };
     } catch {
@@ -814,7 +838,7 @@ export async function getAiNewsBrief(input: {
     }
 
     try {
-      const payload = await callGeminiJson({
+      const { data, provider } = await callGeminiJson({
         schema: newsBriefSchema,
         systemPrompt:
           'You are a macro and market news strategist for HamaFX. Return ONLY JSON. Focus on practical trading implications and risk-first language.',
@@ -824,9 +848,9 @@ export async function getAiNewsBrief(input: {
       });
 
       return {
-        ...payload,
+        ...data,
         generatedAt: new Date().toISOString(),
-        source: 'gemini',
+        source: provider,
       };
     } catch {
       const sentimentScore = keywordSentimentScore(headlines);

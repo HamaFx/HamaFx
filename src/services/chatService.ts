@@ -83,6 +83,12 @@ RULES:
 
 DISCLAIMER: All analysis is for educational purposes only. Past performance does not guarantee future results.`;
 
+function normalizeBackendChatSource(source: string): ChatAssistantResponse['source'] {
+  return source === 'gemini' || source === 'groq' || source === 'scitely' || source === 'rule-based'
+    ? source
+    : 'backend';
+}
+
 export async function sendChatMessage(
   userMessage: string,
   chatHistory: ChatMessage[]
@@ -101,7 +107,7 @@ export async function sendChatMessage(
 
       return {
         ...backend,
-        source: backend.source === 'gemini' || backend.source === 'rule-based' ? backend.source : 'backend',
+        source: normalizeBackendChatSource(backend.source),
       };
     } catch (error) {
       console.warn('[Chat] Backend chat failed, trying direct Gemini/local fallback:', error);

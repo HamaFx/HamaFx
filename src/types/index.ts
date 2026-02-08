@@ -111,7 +111,7 @@ export interface TradeRecord {
   aiAnalysis?: {
     signal: string;
     confidence: number;
-    source: 'gemini' | 'rule-based';
+    source: AiModelSource | 'rule-based';
   };
 }
 
@@ -132,6 +132,8 @@ export interface BalanceSnapshot {
 
 // ===== AI Analysis Types =====
 
+export type AiModelSource = 'gemini' | 'groq' | 'scitely';
+
 export interface AiAnalysisResult {
   signal: 'BUY' | 'SELL' | 'HOLD';
   confidence: number;
@@ -143,7 +145,7 @@ export interface AiAnalysisResult {
   suggestedTakeProfit?: number;
   timeHorizon: 'short-term' | 'medium-term' | 'long-term';
   summary: string;
-  source: 'gemini' | 'rule-based';
+  source: AiModelSource | 'rule-based';
   generatedAt: string;
 }
 
@@ -153,7 +155,7 @@ export interface SentimentResult {
   keyThemes: string[];
   impactAssessment: 'low' | 'medium' | 'high';
   reasoning: string;
-  source: 'gemini' | 'keyword' | 'none';
+  source: AiModelSource | 'keyword' | 'none';
 }
 
 export interface MarketSummary {
@@ -161,7 +163,7 @@ export interface MarketSummary {
   marketMood: 'risk-on' | 'risk-off' | 'mixed' | 'uncertain';
   keyEvent: string;
   outlook: string;
-  source: 'gemini' | 'rule-based';
+  source: AiModelSource | 'rule-based';
   generatedAt: string;
 }
 
@@ -171,7 +173,7 @@ export interface TradeEvalResult {
   diversificationImpact: string;
   suggestions: string[];
   warning?: string;
-  source?: 'gemini' | 'rule-based' | 'backend';
+  source?: AiModelSource | 'rule-based' | 'backend';
   generatedAt?: string;
 }
 
@@ -189,7 +191,7 @@ export interface AiDashboardInsights {
   portfolioActions: string[];
   riskFlags: string[];
   opportunities: AiOpportunity[];
-  source: 'gemini' | 'rule-based' | 'backend';
+  source: AiModelSource | 'rule-based' | 'backend';
   generatedAt: string;
 }
 
@@ -200,7 +202,7 @@ export interface AiNewsBrief {
   actionableIdeas: AiOpportunity[];
   riskLevel: 'low' | 'medium' | 'high';
   sentimentScore: number;
-  source: 'gemini' | 'keyword' | 'backend';
+  source: AiModelSource | 'keyword' | 'backend';
   generatedAt: string;
 }
 
@@ -208,7 +210,7 @@ export interface ChatAssistantResponse {
   reply: string;
   followUps: string[];
   riskLevel: 'low' | 'medium' | 'high';
-  source: 'gemini' | 'rule-based' | 'backend';
+  source: AiModelSource | 'rule-based' | 'backend';
   generatedAt: string;
 }
 
@@ -226,7 +228,7 @@ export interface NewsArticle {
   publishedAt: string;
   category: 'crypto' | 'forex' | 'economy' | 'general';
   sentiment?: number;
-  sentimentSource?: 'gemini' | 'keyword' | 'none';
+  sentimentSource?: AiModelSource | 'keyword' | 'none';
   relatedAssets?: string[];
 }
 

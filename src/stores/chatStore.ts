@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { useAuthStore } from '@/stores/authStore';
 import { getItemWithMigration } from '@/utils/storageMigration';
+import type { AiModelSource } from '@/types';
 
 export interface ChatMessage {
   id: string;
@@ -10,7 +11,7 @@ export interface ChatMessage {
   context?: string; // what page/asset the user was on
   followUps?: string[];
   riskLevel?: 'low' | 'medium' | 'high';
-  source?: 'gemini' | 'rule-based' | 'backend';
+  source?: AiModelSource | 'rule-based' | 'backend';
 }
 
 interface ChatState {
@@ -86,7 +87,7 @@ function loadMessagesFromStorage(userId: string = getCurrentUserId()): ChatMessa
         riskLevel: msg.riskLevel === 'low' || msg.riskLevel === 'medium' || msg.riskLevel === 'high'
           ? msg.riskLevel
           : undefined,
-        source: msg.source === 'gemini' || msg.source === 'rule-based' || msg.source === 'backend'
+        source: msg.source === 'gemini' || msg.source === 'groq' || msg.source === 'scitely' || msg.source === 'rule-based' || msg.source === 'backend'
           ? msg.source
           : undefined,
       }))
