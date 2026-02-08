@@ -316,25 +316,39 @@ async function callOpenAiCompatRaw(
     : (env.SCITELY_MODEL || DEFAULT_SCITELY_MODEL);
   const endpoint = provider === 'groq' ? GROQ_CHAT_URL : SCITELY_CHAT_URL;
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: params.systemPrompt },
-        { role: 'user', content: params.userPrompt },
-      ],
-      temperature: params.temperature ?? 0.35,
-      max_tokens: params.maxOutputTokens ?? 1024,
-      response_format: { type: 'json_object' },
-    }),
-  });
+  const makeRequest = async (enforceJson: boolean) =>
+    fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: 'system', content: params.systemPrompt },
+          { role: 'user', content: params.userPrompt },
+        ],
+        temperature: params.temperature ?? 0.35,
+        max_tokens: params.maxOutputTokens ?? 1024,
+        ...(enforceJson ? { response_format: { type: 'json_object' } } : {}),
+      }),
+    });
 
-  const payload = await response.json().catch(() => ({}));
+  let response = await makeRequest(true);
+  let payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = getProviderErrorMessage(payload, `${provider} API failed (${response.status})`);
+    const shouldRetryWithoutFormat =
+      message.toLowerCase().includes('response_format') ||
+      message.toLowerCase().includes('json_object');
+
+    if (shouldRetryWithoutFormat) {
+      response = await makeRequest(false);
+      payload = await response.json().catch(() => ({}));
+    }
+  }
+
   if (!response.ok) {
     const message = getProviderErrorMessage(payload, `${provider} API failed (${response.status})`);
     throw new Error(`${provider}: ${message}`);
