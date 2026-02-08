@@ -26,10 +26,31 @@ export type AppEnv = z.infer<typeof envSchema>;
 
 let cachedEnv: AppEnv | null = null;
 
+function stripSurroundingQuotes(value: string): string {
+  if (value.length >= 2) {
+    const first = value[0];
+    const last = value[value.length - 1];
+    if ((first === '"' && last === '"') || (first === '\'' && last === '\'')) {
+      return value.slice(1, -1);
+    }
+  }
+  return value;
+}
+
+function normalizeProcessEnv(source: NodeJS.ProcessEnv): Record<string, string | undefined> {
+  const normalized: Record<string, string | undefined> = {};
+  for (const [key, value] of Object.entries(source)) {
+    normalized[key] = typeof value === 'string'
+      ? stripSurroundingQuotes(value.trim())
+      : value;
+  }
+  return normalized;
+}
+
 export function getEnv(): AppEnv {
   if (cachedEnv) return cachedEnv;
 
-  const parsed = envSchema.safeParse(process.env);
+  const parsed = envSchema.safeParse(normalizeProcessEnv(process.env));
   if (!parsed.success) {
     const details = parsed.error.issues.map((issue) => `${issue.path.join('.')}: ${issue.message}`).join(', ');
     throw new Error(`Environment validation failed: ${details}`);
@@ -40,7 +61,7 @@ export function getEnv(): AppEnv {
 }
 
 export function getEnvValidationStatus() {
-  const parsed = envSchema.safeParse(process.env);
+  const parsed = envSchema.safeParse(normalizeProcessEnv(process.env));
   if (parsed.success) {
     return { ok: true as const, missing: [] as string[] };
   }
