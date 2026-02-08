@@ -92,70 +92,70 @@ const DEFAULT_GROQ_MODEL = 'llama-3.1-8b-instant';
 const DEFAULT_SCITELY_MODEL = 'qwen3-32b';
 
 const sentimentSchema = z.object({
-  overallSentiment: z.number().min(-100).max(100),
-  sentimentLabel: z.enum(['very_bearish', 'bearish', 'neutral', 'bullish', 'very_bullish']),
-  keyThemes: z.array(z.string().min(2)).max(6),
-  impactAssessment: z.enum(['low', 'medium', 'high']),
-  reasoning: z.string().min(6).max(420),
+  overallSentiment: z.coerce.number().min(-100).max(100).default(0),
+  sentimentLabel: z.enum(['very_bearish', 'bearish', 'neutral', 'bullish', 'very_bullish']).default('neutral'),
+  keyThemes: z.array(z.string().min(2)).max(6).default([]),
+  impactAssessment: z.enum(['low', 'medium', 'high']).default('medium'),
+  reasoning: z.string().min(6).max(420).default('AI-generated sentiment snapshot.'),
 });
 
 const analysisSchema = z.object({
-  signal: z.enum(['BUY', 'SELL', 'HOLD']),
-  confidence: z.number().min(0).max(100),
-  reasoning: z.array(z.string().min(2)).max(6),
-  riskFactors: z.array(z.string().min(2)).max(6),
-  supportLevel: z.number().optional(),
-  resistanceLevel: z.number().optional(),
-  suggestedStopLoss: z.number().optional(),
-  suggestedTakeProfit: z.number().optional(),
-  timeHorizon: z.enum(['short-term', 'medium-term', 'long-term']),
-  summary: z.string().min(8).max(420),
+  signal: z.enum(['BUY', 'SELL', 'HOLD']).default('HOLD'),
+  confidence: z.coerce.number().min(0).max(100).default(55),
+  reasoning: z.array(z.string().min(2)).max(6).default([]),
+  riskFactors: z.array(z.string().min(2)).max(6).default([]),
+  supportLevel: z.coerce.number().optional(),
+  resistanceLevel: z.coerce.number().optional(),
+  suggestedStopLoss: z.coerce.number().optional(),
+  suggestedTakeProfit: z.coerce.number().optional(),
+  timeHorizon: z.enum(['short-term', 'medium-term', 'long-term']).default('short-term'),
+  summary: z.string().min(8).max(420).default('AI-generated analysis.'),
 });
 
 const chatSchema = z.object({
-  reply: z.string().min(4).max(2000),
-  followUps: z.array(z.string().min(2).max(120)).max(4),
-  riskLevel: z.enum(['low', 'medium', 'high']),
+  reply: z.string().min(4).max(2000).default('AI response generated.'),
+  followUps: z.array(z.string().min(2).max(120)).max(4).default([]),
+  riskLevel: z.enum(['low', 'medium', 'high']).default('medium'),
 });
 
 const insightsSchema = z.object({
-  summary: z.string().min(8).max(420),
-  marketMood: z.enum(['risk-on', 'risk-off', 'mixed', 'uncertain']),
-  keyDrivers: z.array(z.string().min(2)).max(5),
-  portfolioActions: z.array(z.string().min(2)).max(5),
-  riskFlags: z.array(z.string().min(2)).max(4),
+  summary: z.string().min(8).max(420).default('AI-generated dashboard intelligence.'),
+  marketMood: z.enum(['risk-on', 'risk-off', 'mixed', 'uncertain']).default('mixed'),
+  keyDrivers: z.array(z.string().min(2)).max(5).default([]),
+  portfolioActions: z.array(z.string().min(2)).max(5).default([]),
+  riskFlags: z.array(z.string().min(2)).max(4).default([]),
   opportunities: z.array(
     z.object({
       symbol: z.string().min(1).max(24),
       bias: z.enum(['bullish', 'bearish', 'neutral']),
-      confidence: z.number().min(0).max(100),
+      confidence: z.coerce.number().min(0).max(100).default(50),
       reason: z.string().min(3).max(160),
     })
-  ).max(6),
+  ).max(6).default([]),
 });
 
 const tradeEvalSchema = z.object({
-  riskRating: z.enum(['low', 'medium', 'high', 'very_high']),
-  positionSizeAssessment: z.enum(['appropriate', 'too_large', 'too_small']),
-  diversificationImpact: z.string().min(4).max(240),
-  suggestions: z.array(z.string().min(3)).max(5),
+  riskRating: z.enum(['low', 'medium', 'high', 'very_high']).default('medium'),
+  positionSizeAssessment: z.enum(['appropriate', 'too_large', 'too_small']).default('appropriate'),
+  diversificationImpact: z.string().min(4).max(240).default('Neutral diversification impact.'),
+  suggestions: z.array(z.string().min(3)).max(5).default([]),
   warning: z.string().max(220).optional(),
 });
 
 const newsBriefSchema = z.object({
-  headline: z.string().min(6).max(140),
-  summary: z.string().min(12).max(520),
-  themes: z.array(z.string().min(2)).max(6),
+  headline: z.string().min(6).max(140).default('AI news brief'),
+  summary: z.string().min(12).max(520).default('AI-generated market briefing.'),
+  themes: z.array(z.string().min(2)).max(6).default([]),
   actionableIdeas: z.array(
     z.object({
       symbol: z.string().min(1).max(24),
       bias: z.enum(['bullish', 'bearish', 'neutral']),
-      confidence: z.number().min(0).max(100),
+      confidence: z.coerce.number().min(0).max(100).default(50),
       reason: z.string().min(3).max(160),
     })
-  ).max(6),
-  riskLevel: z.enum(['low', 'medium', 'high']),
-  sentimentScore: z.number().min(-100).max(100),
+  ).max(6).default([]),
+  riskLevel: z.enum(['low', 'medium', 'high']).default('medium'),
+  sentimentScore: z.coerce.number().min(-100).max(100).default(0),
 });
 
 function getGeminiKey(): string | null {
@@ -279,6 +279,7 @@ async function callGeminiRaw(params: {
         temperature: params.temperature ?? 0.35,
         topP: 0.9,
         maxOutputTokens: params.maxOutputTokens ?? 1024,
+        responseMimeType: 'application/json',
       },
     }),
   });
@@ -329,6 +330,7 @@ async function callOpenAiCompatRaw(
       ],
       temperature: params.temperature ?? 0.35,
       max_tokens: params.maxOutputTokens ?? 1024,
+      response_format: { type: 'json_object' },
     }),
   });
 
