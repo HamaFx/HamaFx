@@ -2,18 +2,37 @@ import path from "path";
 import { fileURLToPath } from "url";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
+import { sentryVitePlugin } from "@sentry/vite-plugin";
 import { defineConfig } from "vite";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const sentryOrg = process.env.SENTRY_ORG;
+const sentryProject = process.env.SENTRY_PROJECT;
+const sentryAuthToken = process.env.SENTRY_AUTH_TOKEN;
+const sentrySourcemapUploadEnabled = Boolean(sentryOrg && sentryProject && sentryAuthToken);
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    ...(sentrySourcemapUploadEnabled
+      ? [
+          sentryVitePlugin({
+            org: sentryOrg!,
+            project: sentryProject!,
+            authToken: sentryAuthToken!,
+            telemetry: false,
+          }),
+        ]
+      : []),
+  ],
   server: {
     allowedHosts: true,
   },
   build: {
+    sourcemap: sentrySourcemapUploadEnabled,
     manifest: true,
     rollupOptions: {
       output: {

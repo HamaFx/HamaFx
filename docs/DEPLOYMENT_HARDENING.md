@@ -66,3 +66,36 @@ Workflow: `.github/workflows/live-mobile-smoke.yml`
 - Runs every 6 hours + manual trigger
 - Uses deployed URL from `LIVE_BASE_URL`
 - Runs existing mobile smoke suite against live deployment
+
+## 7) Sentry Integration
+
+Frontend runtime reporting:
+
+- Set `VITE_SENTRY_DSN`.
+- Optional tuning: `VITE_SENTRY_ENVIRONMENT`, `VITE_SENTRY_TRACES_SAMPLE_RATE`.
+
+Backend/API reporting:
+
+- Set `SENTRY_DSN`.
+- Optional tuning: `SENTRY_ENVIRONMENT`, `SENTRY_TRACES_SAMPLE_RATE`.
+
+Sourcemap upload (recommended for readable production stack traces):
+
+- Set build-time vars `SENTRY_AUTH_TOKEN`, `SENTRY_ORG`, `SENTRY_PROJECT`.
+- Build automatically enables sourcemaps/upload when all three are present.
+
+## 8) CodeRabbit Integration
+
+1. Install the CodeRabbit GitHub App on the repository.
+2. Keep `.coderabbit.yaml` at repository root to control review behavior.
+3. Ensure branch protection includes the CodeRabbit check once it appears in PR status checks.
+
+## 9) Troubleshooting Checklist
+
+If AI/chat appears to return only fallback responses:
+
+1. Confirm frontend mode in deployed env is `VITE_BACKEND_MODE=on` (or expected value).
+2. Re-login to refresh access token/cookie pair.
+3. Verify `/api/v2/health` and `/api/v2/ai/chat` return successful responses.
+4. Verify provider env values are set and trimmed (`AI_PROVIDER`, `GROQ_API_KEY`, `GEMINI_API_KEY`, etc.).
+5. If deployment protection is enabled, ensure automation requests include `x-vercel-protection-bypass`.

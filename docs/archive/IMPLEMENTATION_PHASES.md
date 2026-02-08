@@ -1,3 +1,5 @@
+> ⚠️ Historical planning document. For current implementation truth, start at `docs/README.md` and `docs/AI_PROJECT_GUIDE.md`.
+
 # Hama Fx — Phased Implementation Plan
 
 > **📊 Status: ALL PHASES COMPLETE** — 7 core phases + 5 UI/UX upgrade phases + 4 premium features. 0 build errors.

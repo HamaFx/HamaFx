@@ -15,6 +15,9 @@ const envSchema = z.object({
   SCITELY_API_KEY: z.string().trim().optional(),
   SCITELY_MODEL: z.string().trim().optional(),
   AI_PROVIDER: z.string().trim().pipe(z.enum(['auto', 'gemini', 'groq', 'scitely'])).optional(),
+  SENTRY_DSN: z.string().trim().optional(),
+  SENTRY_ENVIRONMENT: z.string().trim().optional(),
+  SENTRY_TRACES_SAMPLE_RATE: z.string().trim().optional(),
   PROTECTION_BYPASS_SECRET: z.string().trim().optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 });

@@ -1,5 +1,6 @@
 import { fail } from './http.js';
 import { withCors } from './request.js';
+import { captureApiException } from './sentry.js';
 
 export async function handleApi(
   request: Request,
@@ -9,6 +10,7 @@ export async function handleApi(
     const response = await fn();
     return withCors(response, request);
   } catch (error) {
+    captureApiException(error, request);
     const message = error instanceof Error ? error.message : 'Internal server error';
     return withCors(fail(message, 500), request);
   }

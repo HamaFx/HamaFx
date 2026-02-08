@@ -24,8 +24,23 @@ Set these in Vercel for `Production`, `Preview`, and `Development`:
 - `SCITELY_API_KEY` (optional)
 - `SCITELY_MODEL` (optional, defaults to `qwen3-32b`)
 - `AI_PROVIDER` (`auto`, `gemini`, `groq`, `scitely`; recommended `auto`)
+- `SENTRY_DSN` (optional, backend/server error reporting)
+- `SENTRY_ENVIRONMENT` (optional)
+- `SENTRY_TRACES_SAMPLE_RATE` (optional; value between `0` and `1`)
 - `PROTECTION_BYPASS_SECRET` (optional, recommended)
 - `VITE_BACKEND_MODE` (`off`, `shadow`, `on`)
+- `VITE_SENTRY_DSN` (optional, frontend error reporting)
+- `VITE_SENTRY_ENVIRONMENT` (optional)
+- `VITE_SENTRY_TRACES_SAMPLE_RATE` (optional; value between `0` and `1`)
+- `SENTRY_AUTH_TOKEN` (optional, build-time sourcemap upload)
+- `SENTRY_ORG` (optional, build-time sourcemap upload)
+- `SENTRY_PROJECT` (optional, build-time sourcemap upload)
+
+Notes:
+
+- `CORS_ALLOWED_ORIGIN` must be an exact origin (for example `https://your-domain.com`).
+- For local backend testing, use your local app origin (for example `http://127.0.0.1:5173`).
+- `VITE_BACKEND_MODE` is consumed by frontend code at build/runtime; keep it aligned per environment.
 
 ## 3) Generate and Apply DB Migrations
 
@@ -41,6 +56,13 @@ npm run db:migrate
 - env validation status
 - postgres connectivity
 - redis connectivity (if configured)
+
+Recommended quick validation:
+
+```bash
+npm run check
+npm run e2e:smoke
+```
 
 ## 5) Frontend Rollout Modes
 
@@ -63,4 +85,7 @@ This sends current local `hamafx_*` state to `/api/v2/migrate/import`.
 
 - `0 3 * * *` -> `/api/v2/cron/maintenance`
 
-Endpoint requires `CRON_SECRET` in authorization header.
+Endpoint auth accepts either:
+
+- `Authorization: Bearer <CRON_SECRET>`
+- `x-cron-secret: <CRON_SECRET>`

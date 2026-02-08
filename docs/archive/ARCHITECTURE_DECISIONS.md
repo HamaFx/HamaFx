@@ -1,3 +1,5 @@
+> ⚠️ Historical planning document. For current implementation truth, start at `docs/README.md` and `docs/AI_PROJECT_GUIDE.md`.
+
 # Hama Fx — Architecture Decision Records
 
 > **📊 Status: ALL 13 ADRs IMPLEMENTED**

@@ -1,3 +1,5 @@
+> ⚠️ Historical planning document. For current implementation truth, start at `docs/README.md` and `docs/AI_PROJECT_GUIDE.md`.
+
 # Hama Fx — Backend Migration Guide
 
 > **📊 Status: V1 COMPLETE (Client-Side) — This guide is for FUTURE V2 backend development**

@@ -1,3 +1,5 @@
+> ⚠️ Historical planning document. For current implementation truth, start at `docs/README.md` and `docs/AI_PROJECT_GUIDE.md`.
+
 # Hama Fx — Forex & Crypto Trading Platform
 ## Master Project Plan
 

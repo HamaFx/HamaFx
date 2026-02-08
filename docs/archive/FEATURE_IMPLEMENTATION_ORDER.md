@@ -1,3 +1,5 @@
+> ⚠️ Historical planning document. For current implementation truth, start at `docs/README.md` and `docs/AI_PROJECT_GUIDE.md`.
+
 # Hama Fx — Premium Feature Implementation Order
 
 > **📊 Status: ALL 4 PREMIUM FEATURES COMPLETE**
