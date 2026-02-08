@@ -159,6 +159,7 @@ Core AI endpoints:
 - Backend endpoint -> `/api/v2/ai/chat`
 
 If backend request fails, frontend intentionally falls back to local deterministic responses.
+AI chat now supports optional mode routing (`general|portfolio|risk|news|execution`) for specialized responses.
 
 ## 6) Data Flow (Critical Paths)
 

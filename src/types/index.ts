@@ -247,6 +247,8 @@ export interface ChatAssistantResponse {
   generatedAt: string;
 }
 
+export type AiChatMode = 'general' | 'portfolio' | 'risk' | 'news' | 'execution';
+
 export type AiSentimentResult = SentimentResult;
 
 // ===== News Types =====

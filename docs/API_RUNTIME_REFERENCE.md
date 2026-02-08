@@ -83,6 +83,9 @@ Frontend backend client (`src/services/backend/http.ts`) unwraps `data` automati
 - `GET /api/v2/ai/news-intel`
 - `GET /api/v2/ai/status`
 
+`POST /api/v2/ai/chat` request supports optional mode routing:
+- `mode=general|portfolio|risk|news|execution`
+
 ## 3.7 Auth Requirement Matrix
 
 Public/no auth:

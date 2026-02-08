@@ -3,7 +3,7 @@ import { useMarketStore } from '@/stores/marketStore';
 import { useWatchlistStore } from '@/stores/watchlistStore';
 import { useAlertStore } from '@/stores/alertStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import type { ChatAssistantResponse } from '@/types';
+import type { AiChatMode, ChatAssistantResponse } from '@/types';
 import type { ChatMessage } from '@/stores/chatStore';
 import { isBackendEnabled } from '@/services/backend/config';
 import { apiAiChat } from '@/services/backend/aiApi';
@@ -89,10 +89,36 @@ function normalizeBackendChatSource(source: string): ChatAssistantResponse['sour
     : 'backend';
 }
 
+function getModeDirective(mode?: AiChatMode): string {
+  switch (mode) {
+    case 'portfolio':
+      return 'COPILOT MODE: Portfolio Coach. Focus on concentration, PnL quality, and rebalance actions.';
+    case 'risk':
+      return 'COPILOT MODE: Risk Manager. Focus on downside protection, sizing, and invalidation rules.';
+    case 'news':
+      return 'COPILOT MODE: News Strategist. Focus on narrative regimes, catalysts, and event risk.';
+    case 'execution':
+      return 'COPILOT MODE: Execution Coach. Focus on entries, stop placement, scaling, and trade plans.';
+    case 'general':
+    default:
+      return 'COPILOT MODE: General. Balance opportunities with strict risk discipline.';
+  }
+}
+
+function withContextHint(message: string, contextHint?: string): string {
+  const hint = contextHint?.trim();
+  if (!hint) return message;
+  return `${message}\n\nContext hint:\n${hint}`;
+}
+
 export async function sendChatMessage(
   userMessage: string,
-  chatHistory: ChatMessage[]
+  chatHistory: ChatMessage[],
+  options?: { mode?: AiChatMode; contextHint?: string }
 ): Promise<ChatAssistantResponse> {
+  const modeDirective = getModeDirective(options?.mode);
+  const enrichedMessage = withContextHint(userMessage, options?.contextHint);
+
   if (isBackendEnabled()) {
     try {
       const historyPayload = chatHistory
@@ -101,8 +127,9 @@ export async function sendChatMessage(
         .map((message) => ({ role: message.role as 'user' | 'assistant', content: message.content }));
 
       const backend = await apiAiChat({
-        message: userMessage,
+        message: enrichedMessage,
         history: historyPayload,
+        mode: options?.mode,
       });
 
       return {
@@ -116,7 +143,7 @@ export async function sendChatMessage(
 
   const apiKey = useSettingsStore.getState().getGeminiKey();
   if (!apiKey) {
-    return generateLocalResponse(userMessage);
+    return generateLocalResponse(userMessage, options?.mode);
   }
 
   const context = buildFullContext();
@@ -129,7 +156,7 @@ export async function sendChatMessage(
   const contents = [
     {
       role: 'user' as const,
-      parts: [{ text: `${SYSTEM_PROMPT}\n\nCURRENT CONTEXT:\n${context}` }],
+      parts: [{ text: `${SYSTEM_PROMPT}\n\n${modeDirective}\n\nCURRENT CONTEXT:\n${context}` }],
     },
     {
       role: 'model' as const,
@@ -138,7 +165,7 @@ export async function sendChatMessage(
     ...recentHistory,
     {
       role: 'user' as const,
-      parts: [{ text: userMessage }],
+      parts: [{ text: enrichedMessage }],
     },
   ];
 
@@ -194,14 +221,34 @@ export async function sendChatMessage(
     };
   } catch (error) {
     console.error('Chat API error:', error);
-    return generateLocalResponse(userMessage);
+    return generateLocalResponse(userMessage, options?.mode);
   }
 }
 
-function generateLocalResponse(message: string): ChatAssistantResponse {
+function generateLocalResponse(message: string, mode?: AiChatMode): ChatAssistantResponse {
   const lower = message.toLowerCase();
 
-  if (lower.includes('portfolio') || lower.includes('position') || lower.includes('balance')) {
+  if (mode === 'execution') {
+    return {
+      reply: 'Execution Coach mode:\n\n- Enter only after confirmation candle closes.\n- Define stop-loss before placing the order.\n- Use staged entries to reduce slippage risk.\n- Keep risk per trade controlled.\n\nEnable backend AI for deeper scenario-based execution plans.',
+      followUps: ['Build an entry checklist', 'How should I scale into this trade?', 'Where should invalidation be?'],
+      riskLevel: 'medium',
+      generatedAt: new Date().toISOString(),
+      source: 'rule-based',
+    };
+  }
+
+  if (mode === 'news') {
+    return {
+      reply: 'News Strategist mode:\n\n- Focus on catalyst quality, not headline quantity.\n- Treat high-volatility releases as risk events first.\n- Wait for post-news structure before committing size.\n\nEnable backend AI for narrative regime and catalyst intelligence.',
+      followUps: ['Summarize top catalysts', 'What is the market regime?', 'How should I trade around news risk?'],
+      riskLevel: 'medium',
+      generatedAt: new Date().toISOString(),
+      source: 'rule-based',
+    };
+  }
+
+  if (mode === 'portfolio' || mode === 'risk' || lower.includes('portfolio') || lower.includes('position') || lower.includes('balance')) {
     return {
       reply: `📊 Here's your current status:\n\n${buildPortfolioContext()}\n\n💡 Tip: Enable backend AI mode for deeper strategy guidance and proactive recommendations.`,
       followUps: ['What is my biggest portfolio risk?', 'How should I rebalance?', 'Show my recent performance'],

@@ -1,5 +1,6 @@
 import type {
   AiAnalysisResult,
+  AiChatMode,
   AiCommandCenter,
   AiDashboardInsights,
   AiNewsBrief,
@@ -14,6 +15,7 @@ import { backendFetch } from './http';
 export async function apiAiChat(payload: {
   message: string;
   history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  mode?: AiChatMode;
 }): Promise<ChatAssistantResponse> {
   return backendFetch<ChatAssistantResponse>('/api/v2/ai/chat', {
     method: 'POST',

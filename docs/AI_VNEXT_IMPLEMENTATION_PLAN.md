@@ -43,6 +43,8 @@ This plan excludes the previously deferred tracks:
 - [x] Add `getCommandCenter`, `getNewsIntel`, and `getAiRuntimeStatus` in `src/services/gemini.ts`.
 - [x] Upgrade `src/pages/Dashboard.tsx` to render proactive command-center guidance.
 - [x] Upgrade `src/pages/News.tsx` to render AI narrative/catalyst/risk intelligence.
+- [x] Upgrade `src/components/AIChatDrawer.tsx` to mode-aware copilot UX with proactive panels and runtime visibility.
+- [x] Add mode-aware chat request support in `api/_v2/ai/chat.ts`, `api/_lib/ai.ts`, `src/services/backend/aiApi.ts`, and `src/services/chatService.ts`.
 - [x] Update canonical docs (`docs/API_RUNTIME_REFERENCE.md`, `docs/AI_PROJECT_GUIDE.md`, `docs/README.md`).
 - [ ] Add backend integration tests for new AI endpoints.
 - [ ] Add focused UI tests for command-center and news-intel rendering.

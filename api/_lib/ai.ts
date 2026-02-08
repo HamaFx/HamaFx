@@ -13,6 +13,7 @@ type RiskLevel = 'low' | 'medium' | 'high';
 type OpportunityBias = 'bullish' | 'bearish' | 'neutral';
 type AiProvider = 'gemini' | 'groq' | 'scitely';
 type AiModelSource = AiProvider;
+type AiChatMode = 'general' | 'portfolio' | 'risk' | 'news' | 'execution';
 
 export type AiOpportunity = {
   symbol: string;
@@ -557,6 +558,22 @@ function inferPosture(marketMood: MarketMood, riskFlags: string[]): AiCommandCen
   return 'neutral';
 }
 
+function getChatModeDirective(mode: AiChatMode | undefined): string {
+  switch (mode) {
+    case 'portfolio':
+      return 'Mode=Portfolio Coach. Prioritize position-level diagnostics, concentration, drawdown control, and actionable rebalance steps.';
+    case 'risk':
+      return 'Mode=Risk Manager. Prioritize downside protection, invalidation levels, stop discipline, and conservative sizing.';
+    case 'news':
+      return 'Mode=News Strategist. Prioritize macro narrative, catalysts, sentiment regime, and event-driven trade implications.';
+    case 'execution':
+      return 'Mode=Execution Coach. Prioritize entry criteria, staged execution, stop-loss/take-profit planning, and scenario branches.';
+    case 'general':
+    default:
+      return 'Mode=General Copilot. Balance portfolio context, market conditions, and practical risk-first guidance.';
+  }
+}
+
 type AiContext = {
   portfolio: {
     virtualBalance: number;
@@ -808,11 +825,32 @@ export async function getAiCommandCenter(userId: string): Promise<AiCommandCente
   });
 }
 
-function fallbackChatResponse(message: string, context: AiContext): AiChatReply {
+function fallbackChatResponse(message: string, context: AiContext, mode: AiChatMode | undefined): AiChatReply {
   const lower = message.toLowerCase();
   const start = context.market.topCrypto[0];
 
-  if (lower.includes('portfolio') || lower.includes('risk')) {
+  if (mode === 'news') {
+    const topHeadline = context.news[0]?.title ?? 'No high-signal headline available';
+    return {
+      reply: `News mode snapshot: ${topHeadline}. Current event risk is elevated when headlines cluster around policy or regulation. Trade only confirmed setups and avoid chasing first headlines.`,
+      followUps: ['Summarize top catalysts', 'What is the narrative regime?', 'Show risk checklist for news trades'],
+      riskLevel: 'medium',
+      generatedAt: new Date().toISOString(),
+      source: 'rule-based',
+    };
+  }
+
+  if (mode === 'execution') {
+    return {
+      reply: `Execution mode: use staged entries, define invalidation before entry, and cap single-position size to ${context.riskProfile.maxPositionSizePercent}% of equity. Avoid market chasing during volatility spikes.`,
+      followUps: ['Draft entry and stop plan', 'How should I scale in?', 'What invalidation level makes sense?'],
+      riskLevel: 'medium',
+      generatedAt: new Date().toISOString(),
+      source: 'rule-based',
+    };
+  }
+
+  if (mode === 'portfolio' || mode === 'risk' || lower.includes('portfolio') || lower.includes('risk')) {
     return {
       reply: `Portfolio snapshot: ${context.portfolio.positionsCount} open position(s), ${context.portfolio.openOrdersCount} open order(s), and $${context.portfolio.virtualBalance.toFixed(2)} cash. Highest priority: keep each position under ${context.riskProfile.maxPositionSizePercent}% and protect downside with defined exits.`,
       followUps: ['Show my concentration risk', 'How should I size the next trade?', 'What risk level am I running now?'],
@@ -835,16 +873,19 @@ export async function getAiChatReply(params: {
   userId: string;
   message: string;
   history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  mode?: AiChatMode;
 }): Promise<AiChatReply> {
   const context = await buildAiContext(params.userId);
   const history = Array.isArray(params.history) ? params.history.slice(-8) : [];
+  const mode = params.mode ?? 'general';
+  const modeDirective = getChatModeDirective(mode);
 
   try {
     const { data, provider } = await callGeminiJson({
       schema: chatSchema,
       systemPrompt:
         'You are HamaFX Copilot. Return ONLY JSON. Be concise, risk-first, educational, and grounded in provided portfolio/market context. Mention uncertainty when data is incomplete.',
-      userPrompt: `Context:\n${JSON.stringify(context)}\n\nRecent history:\n${JSON.stringify(history)}\n\nUser message:\n${params.message}\n\nReturn JSON: reply, followUps (max 4), riskLevel.`,
+      userPrompt: `Context:\n${JSON.stringify(context)}\n\nMode directive:\n${modeDirective}\n\nRecent history:\n${JSON.stringify(history)}\n\nUser message:\n${params.message}\n\nReturn JSON: reply, followUps (max 4), riskLevel.`,
       temperature: 0.45,
       maxOutputTokens: 1100,
     });
@@ -855,7 +896,7 @@ export async function getAiChatReply(params: {
       source: provider,
     };
   } catch {
-    return fallbackChatResponse(params.message, context);
+    return fallbackChatResponse(params.message, context, mode);
   }
 }
 
