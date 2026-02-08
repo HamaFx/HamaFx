@@ -66,3 +66,8 @@ Workflow: `.github/workflows/live-mobile-smoke.yml`
 - Runs every 6 hours + manual trigger
 - Uses deployed URL from `LIVE_BASE_URL`
 - Runs existing mobile smoke suite against live deployment
+
+
+## 7) Sentry (Official SDK)
+
+Use `docs/SENTRY_OFFICIAL_SDK_SETUP.md` for exact install + Vercel setup + 403 troubleshooting.
