@@ -13,6 +13,7 @@ type RiskLevel = 'low' | 'medium' | 'high';
 type OpportunityBias = 'bullish' | 'bearish' | 'neutral';
 type AiProvider = 'gemini' | 'groq' | 'scitely';
 type AiModelSource = AiProvider;
+type AiChatMode = 'general' | 'portfolio' | 'risk' | 'news' | 'execution';
 
 export type AiOpportunity = {
   symbol: string;
@@ -80,6 +81,39 @@ export type AiNewsBrief = {
   themes: string[];
   actionableIdeas: AiOpportunity[];
   riskLevel: RiskLevel;
+  sentimentScore: number;
+  generatedAt: string;
+  source: AiModelSource | 'keyword';
+};
+
+export type AiRuntimeStatus = {
+  hasAnyProvider: boolean;
+  preferredProvider: 'auto' | AiProvider;
+  configuredProviders: AiProvider[];
+  providerOrder: AiProvider[];
+  notes: string[];
+  generatedAt: string;
+};
+
+export type AiCommandCenter = {
+  headline: string;
+  posture: 'offensive' | 'defensive' | 'neutral';
+  confidence: number;
+  topActions: string[];
+  blockers: string[];
+  opportunities: AiOpportunity[];
+  watchlistFocus: string[];
+  generatedAt: string;
+  source: AiModelSource | 'rule-based';
+};
+
+export type AiNewsIntel = {
+  narrative: string;
+  regime: MarketMood;
+  catalysts: string[];
+  sectorPulse: string[];
+  assetImpacts: AiOpportunity[];
+  riskChecklist: string[];
   sentimentScore: number;
   generatedAt: string;
   source: AiModelSource | 'keyword';
@@ -155,6 +189,40 @@ const newsBriefSchema = z.object({
     })
   ).max(6).default([]),
   riskLevel: z.enum(['low', 'medium', 'high']).default('medium'),
+  sentimentScore: z.coerce.number().min(-100).max(100).default(0),
+});
+
+const commandCenterSchema = z.object({
+  headline: z.string().min(8).max(220).default('Maintain disciplined risk and selective execution.'),
+  posture: z.enum(['offensive', 'defensive', 'neutral']).default('neutral'),
+  confidence: z.coerce.number().min(0).max(100).default(58),
+  topActions: z.array(z.string().min(2)).max(5).default([]),
+  blockers: z.array(z.string().min(2)).max(4).default([]),
+  opportunities: z.array(
+    z.object({
+      symbol: z.string().min(1).max(24),
+      bias: z.enum(['bullish', 'bearish', 'neutral']),
+      confidence: z.coerce.number().min(0).max(100).default(50),
+      reason: z.string().min(3).max(160),
+    })
+  ).max(6).default([]),
+  watchlistFocus: z.array(z.string().min(1).max(24)).max(10).default([]),
+});
+
+const newsIntelSchema = z.object({
+  narrative: z.string().min(10).max(560).default('Narrative is mixed with event-driven volatility.'),
+  regime: z.enum(['risk-on', 'risk-off', 'mixed', 'uncertain']).default('mixed'),
+  catalysts: z.array(z.string().min(2)).max(8).default([]),
+  sectorPulse: z.array(z.string().min(2)).max(6).default([]),
+  assetImpacts: z.array(
+    z.object({
+      symbol: z.string().min(1).max(24),
+      bias: z.enum(['bullish', 'bearish', 'neutral']),
+      confidence: z.coerce.number().min(0).max(100).default(50),
+      reason: z.string().min(3).max(160),
+    })
+  ).max(8).default([]),
+  riskChecklist: z.array(z.string().min(2)).max(6).default([]),
   sentimentScore: z.coerce.number().min(-100).max(100).default(0),
 });
 
@@ -244,6 +312,43 @@ function getProviderOrder(): AiProvider[] {
   if (preferred === 'auto') return available;
   if (!available.includes(preferred)) return available;
   return [preferred, ...available.filter((provider) => provider !== preferred)];
+}
+
+export function getAiRuntimeStatus(): AiRuntimeStatus {
+  try {
+    const env = getEnv();
+    const configuredProviders = ([
+      env.GEMINI_API_KEY ? 'gemini' : null,
+      env.GROQ_API_KEY ? 'groq' : null,
+      env.SCITELY_API_KEY ? 'scitely' : null,
+    ].filter(Boolean) as AiProvider[]);
+    const preferredProvider: 'auto' | AiProvider = env.AI_PROVIDER ?? 'auto';
+    const providerOrder = getProviderOrder();
+    const notes = configuredProviders.length === 0
+      ? ['No AI provider keys are configured. Endpoints will use deterministic fallback responses.']
+      : preferredProvider === 'auto'
+      ? ['Provider order is automatic and follows configured availability.']
+      : [`Preferred provider is pinned to ${preferredProvider}.`];
+
+    return {
+      hasAnyProvider: configuredProviders.length > 0,
+      preferredProvider,
+      configuredProviders,
+      providerOrder,
+      notes,
+      generatedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'Unknown environment error';
+    return {
+      hasAnyProvider: false,
+      preferredProvider: 'auto',
+      configuredProviders: [],
+      providerOrder: [],
+      notes: [`Runtime env unavailable: ${reason}`],
+      generatedAt: new Date().toISOString(),
+    };
+  }
 }
 
 function getProviderErrorMessage(payload: unknown, fallback: string): string {
@@ -418,6 +523,55 @@ function keywordSentimentScore(lines: string[]): number {
   }
 
   return clamp(score, -100, 100);
+}
+
+function inferHeadlineThemes(headlines: string[]): string[] {
+  const themeSignals: Array<{ theme: string; keywords: string[] }> = [
+    { theme: 'Monetary policy', keywords: ['fed', 'ecb', 'rates', 'inflation', 'cpi', 'policy'] },
+    { theme: 'Risk sentiment', keywords: ['risk', 'fear', 'uncertainty', 'volatility', 'selloff'] },
+    { theme: 'Crypto adoption', keywords: ['bitcoin', 'ethereum', 'etf', 'on-chain', 'institutional'] },
+    { theme: 'Macro growth', keywords: ['gdp', 'jobs', 'growth', 'recession', 'demand'] },
+    { theme: 'Regulation', keywords: ['ban', 'regulator', 'law', 'sec', 'compliance'] },
+    { theme: 'Liquidity', keywords: ['inflow', 'outflow', 'liquidity', 'yield', 'treasury'] },
+  ];
+
+  const scores = themeSignals.map((entry) => {
+    const score = headlines.reduce((sum, headline) => {
+      const lower = headline.toLowerCase();
+      return sum + entry.keywords.reduce((acc, keyword) => acc + (lower.includes(keyword) ? 1 : 0), 0);
+    }, 0);
+    return { theme: entry.theme, score };
+  });
+
+  const ranked = scores
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.theme);
+
+  if (ranked.length > 0) return ranked.slice(0, 5);
+  return ['Event-driven volatility', 'Macro uncertainty'];
+}
+
+function inferPosture(marketMood: MarketMood, riskFlags: string[]): AiCommandCenter['posture'] {
+  if (marketMood === 'risk-off' || riskFlags.length >= 2) return 'defensive';
+  if (marketMood === 'risk-on' && riskFlags.length === 0) return 'offensive';
+  return 'neutral';
+}
+
+function getChatModeDirective(mode: AiChatMode | undefined): string {
+  switch (mode) {
+    case 'portfolio':
+      return 'Mode=Portfolio Coach. Prioritize position-level diagnostics, concentration, drawdown control, and actionable rebalance steps.';
+    case 'risk':
+      return 'Mode=Risk Manager. Prioritize downside protection, invalidation levels, stop discipline, and conservative sizing.';
+    case 'news':
+      return 'Mode=News Strategist. Prioritize macro narrative, catalysts, sentiment regime, and event-driven trade implications.';
+    case 'execution':
+      return 'Mode=Execution Coach. Prioritize entry criteria, staged execution, stop-loss/take-profit planning, and scenario branches.';
+    case 'general':
+    default:
+      return 'Mode=General Copilot. Balance portfolio context, market conditions, and practical risk-first guidance.';
+  }
 }
 
 type AiContext = {
@@ -595,6 +749,30 @@ function fallbackInsights(context: AiContext): AiDashboardInsights {
   };
 }
 
+function fallbackCommandCenter(context: AiContext): AiCommandCenter {
+  const insights = fallbackInsights(context);
+  const posture = inferPosture(insights.marketMood, insights.riskFlags);
+  const confidenceBase = posture === 'offensive' ? 68 : posture === 'defensive' ? 62 : 56;
+  const confidence = clamp(confidenceBase - insights.riskFlags.length * 4, 35, 88);
+
+  return {
+    headline:
+      posture === 'offensive'
+        ? 'Momentum is constructive. Stay selective and scale entries.'
+        : posture === 'defensive'
+        ? 'Risk conditions are elevated. Protect downside and reduce exposure.'
+        : 'Mixed conditions. Favor confirmation-based setups over impulse trades.',
+    posture,
+    confidence,
+    topActions: insights.portfolioActions.slice(0, 4),
+    blockers: insights.riskFlags.slice(0, 4),
+    opportunities: insights.opportunities.slice(0, 4),
+    watchlistFocus: context.watchlist.symbols.slice(0, 8),
+    generatedAt: new Date().toISOString(),
+    source: 'rule-based',
+  };
+}
+
 export async function getAiDashboardInsights(userId: string): Promise<AiDashboardInsights> {
   const cacheKey = `ai:insights:${userId}`;
   return withRedisCache(cacheKey, 90, async () => {
@@ -621,11 +799,58 @@ export async function getAiDashboardInsights(userId: string): Promise<AiDashboar
   });
 }
 
-function fallbackChatResponse(message: string, context: AiContext): AiChatReply {
+export async function getAiCommandCenter(userId: string): Promise<AiCommandCenter> {
+  const cacheKey = `ai:command-center:${userId}`;
+  return withRedisCache(cacheKey, 90, async () => {
+    const context = await buildAiContext(userId);
+
+    try {
+      const { data, provider } = await callGeminiJson({
+        schema: commandCenterSchema,
+        systemPrompt:
+          'You are HamaFX AI Command Center. Return ONLY JSON. Be risk-first, actionable, and concise. Prioritize high-signal actions over generic advice.',
+        userPrompt: `Context:\n${JSON.stringify(context)}\n\nReturn JSON with headline, posture, confidence, topActions, blockers, opportunities, watchlistFocus.`,
+        temperature: 0.28,
+        maxOutputTokens: 950,
+      });
+
+      return {
+        ...data,
+        generatedAt: new Date().toISOString(),
+        source: provider,
+      };
+    } catch {
+      return fallbackCommandCenter(context);
+    }
+  });
+}
+
+function fallbackChatResponse(message: string, context: AiContext, mode: AiChatMode | undefined): AiChatReply {
   const lower = message.toLowerCase();
   const start = context.market.topCrypto[0];
 
-  if (lower.includes('portfolio') || lower.includes('risk')) {
+  if (mode === 'news') {
+    const topHeadline = context.news[0]?.title ?? 'No high-signal headline available';
+    return {
+      reply: `News mode snapshot: ${topHeadline}. Current event risk is elevated when headlines cluster around policy or regulation. Trade only confirmed setups and avoid chasing first headlines.`,
+      followUps: ['Summarize top catalysts', 'What is the narrative regime?', 'Show risk checklist for news trades'],
+      riskLevel: 'medium',
+      generatedAt: new Date().toISOString(),
+      source: 'rule-based',
+    };
+  }
+
+  if (mode === 'execution') {
+    return {
+      reply: `Execution mode: use staged entries, define invalidation before entry, and cap single-position size to ${context.riskProfile.maxPositionSizePercent}% of equity. Avoid market chasing during volatility spikes.`,
+      followUps: ['Draft entry and stop plan', 'How should I scale in?', 'What invalidation level makes sense?'],
+      riskLevel: 'medium',
+      generatedAt: new Date().toISOString(),
+      source: 'rule-based',
+    };
+  }
+
+  if (mode === 'portfolio' || mode === 'risk' || lower.includes('portfolio') || lower.includes('risk')) {
     return {
       reply: `Portfolio snapshot: ${context.portfolio.positionsCount} open position(s), ${context.portfolio.openOrdersCount} open order(s), and $${context.portfolio.virtualBalance.toFixed(2)} cash. Highest priority: keep each position under ${context.riskProfile.maxPositionSizePercent}% and protect downside with defined exits.`,
       followUps: ['Show my concentration risk', 'How should I size the next trade?', 'What risk level am I running now?'],
@@ -648,16 +873,19 @@ export async function getAiChatReply(params: {
   userId: string;
   message: string;
   history?: Array<{ role: 'user' | 'assistant'; content: string }>;
+  mode?: AiChatMode;
 }): Promise<AiChatReply> {
   const context = await buildAiContext(params.userId);
   const history = Array.isArray(params.history) ? params.history.slice(-8) : [];
+  const mode = params.mode ?? 'general';
+  const modeDirective = getChatModeDirective(mode);
 
   try {
     const { data, provider } = await callGeminiJson({
       schema: chatSchema,
       systemPrompt:
         'You are HamaFX Copilot. Return ONLY JSON. Be concise, risk-first, educational, and grounded in provided portfolio/market context. Mention uncertainty when data is incomplete.',
-      userPrompt: `Context:\n${JSON.stringify(context)}\n\nRecent history:\n${JSON.stringify(history)}\n\nUser message:\n${params.message}\n\nReturn JSON: reply, followUps (max 4), riskLevel.`,
+      userPrompt: `Context:\n${JSON.stringify(context)}\n\nMode directive:\n${modeDirective}\n\nRecent history:\n${JSON.stringify(history)}\n\nUser message:\n${params.message}\n\nReturn JSON: reply, followUps (max 4), riskLevel.`,
       temperature: 0.45,
       maxOutputTokens: 1100,
     });
@@ -668,7 +896,7 @@ export async function getAiChatReply(params: {
       source: provider,
     };
   } catch {
-    return fallbackChatResponse(params.message, context);
+    return fallbackChatResponse(params.message, context, mode);
   }
 }
 
@@ -881,6 +1109,94 @@ export async function getAiNewsBrief(input: {
         generatedAt: new Date().toISOString(),
         source: 'keyword',
       };
+    }
+  });
+}
+
+function fallbackNewsIntel(params: {
+  headlines: string[];
+  category: string;
+  symbols: string[];
+}): AiNewsIntel {
+  const sentimentScore = keywordSentimentScore(params.headlines);
+  const regime: MarketMood = sentimentScore >= 25
+    ? 'risk-on'
+    : sentimentScore <= -25
+    ? 'risk-off'
+    : 'mixed';
+  const catalysts = params.headlines.slice(0, 5).map((headline) => truncate(headline, 120));
+  const themes = inferHeadlineThemes(params.headlines);
+  const fallbackSymbols = params.symbols.length > 0 ? params.symbols : ['BTC', 'ETH', 'EURUSD'];
+  const assetImpacts: AiOpportunity[] = fallbackSymbols.slice(0, 4).map((symbol, index) => ({
+    symbol,
+    bias: sentimentScore > 20 ? 'bullish' : sentimentScore < -20 ? 'bearish' : 'neutral',
+    confidence: clamp(58 - index * 5 + Math.abs(sentimentScore) * 0.15, 42, 82),
+    reason: `Headline momentum suggests ${sentimentScore > 20 ? 'constructive' : sentimentScore < -20 ? 'defensive' : 'mixed'} bias.`,
+  }));
+
+  const riskChecklist = [
+    'Confirm setup invalidation levels before entry.',
+    'Avoid oversized entries during headline-driven spikes.',
+    sentimentScore < -30 ? 'Reduce leverage until volatility normalizes.' : 'Respect stop losses and avoid revenge trading.',
+  ];
+
+  return {
+    narrative: `Fallback narrative (${params.category}): ${regime === 'risk-on' ? 'risk appetite is improving' : regime === 'risk-off' ? 'risk appetite is weak' : 'signals remain mixed'}. Focus on confirmed setups.`,
+    regime,
+    catalysts,
+    sectorPulse: themes,
+    assetImpacts,
+    riskChecklist,
+    sentimentScore,
+    generatedAt: new Date().toISOString(),
+    source: 'keyword',
+  };
+}
+
+export async function getAiNewsIntel(input: {
+  userId: string;
+  category?: string;
+  limit?: number;
+}): Promise<AiNewsIntel> {
+  const category = input.category || 'all';
+  const limit = clamp(input.limit ?? 16, 6, 30);
+  const cacheKey = `ai:news-intel:${input.userId}:${category}:${limit}`;
+
+  return withRedisCache(cacheKey, 120, async () => {
+    const news = await getNews(category).catch(() => []);
+    const normalizedNews = Array.isArray(news) ? news.slice(0, limit) : [];
+    const headlines = normalizedNews
+      .map((item) => asString((item as JsonRecord).title))
+      .filter(Boolean);
+    const relatedSymbols = [...new Set(
+      normalizedNews.flatMap((item) => {
+        const raw = (item as JsonRecord).relatedAssets;
+        if (!Array.isArray(raw)) return [];
+        return raw.map((entry) => asString(entry).toUpperCase()).filter(Boolean);
+      })
+    )].slice(0, 8);
+
+    if (!headlines.length) {
+      return fallbackNewsIntel({ headlines: [], category, symbols: relatedSymbols });
+    }
+
+    try {
+      const { data, provider } = await callGeminiJson({
+        schema: newsIntelSchema,
+        systemPrompt:
+          'You are HamaFX macro intelligence engine. Return ONLY JSON. Build a concise market narrative with catalysts, regime call, sector pulse, actionable impacts, and risk checklist.',
+        userPrompt: `Category=${category}\nHeadlines:\n${headlines.map((headline, index) => `${index + 1}. ${headline}`).join('\n')}\nRelatedSymbols=${relatedSymbols.join(',')}\n\nReturn JSON with narrative, regime, catalysts, sectorPulse, assetImpacts, riskChecklist, sentimentScore.`,
+        temperature: 0.32,
+        maxOutputTokens: 1200,
+      });
+
+      return {
+        ...data,
+        generatedAt: new Date().toISOString(),
+        source: provider,
+      };
+    } catch {
+      return fallbackNewsIntel({ headlines, category, symbols: relatedSymbols });
     }
   });
 }

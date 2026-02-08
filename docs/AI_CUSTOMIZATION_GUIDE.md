@@ -58,6 +58,7 @@ Backend AI orchestration:
 
 - `api/_lib/ai.ts`
 - Endpoint handlers: `api/_v2/ai/*`
+- Proactive intelligence endpoints: `api/_v2/ai/command-center.ts`, `api/_v2/ai/news-intel.ts`, `api/_v2/ai/status.ts`
 
 When changing output shape, keep `src/types/index.ts` aligned and update UI renderers.
 
@@ -66,6 +67,7 @@ When changing output shape, keep `src/types/index.ts` aligned and update UI rend
 - Frontend merge/fallback strategy: `src/services/newsService.ts`
 - Backend news proxy and normalization: `api/_lib/news.ts`, `api/_v2/news.ts`
 - Curated fallback dataset: `src/data/curatedNews.ts`
+- AI narrative overlays: `src/services/gemini.ts` (`getNewsBrief`, `getNewsIntel`) + `src/pages/News.tsx`
 
 ## 2.7 Backend Domain State
 

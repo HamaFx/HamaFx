@@ -206,6 +206,39 @@ export interface AiNewsBrief {
   generatedAt: string;
 }
 
+export interface AiNewsIntel {
+  narrative: string;
+  regime: 'risk-on' | 'risk-off' | 'mixed' | 'uncertain';
+  catalysts: string[];
+  sectorPulse: string[];
+  assetImpacts: AiOpportunity[];
+  riskChecklist: string[];
+  sentimentScore: number;
+  source: AiModelSource | 'keyword' | 'backend';
+  generatedAt: string;
+}
+
+export interface AiCommandCenter {
+  headline: string;
+  posture: 'offensive' | 'defensive' | 'neutral';
+  confidence: number;
+  topActions: string[];
+  blockers: string[];
+  opportunities: AiOpportunity[];
+  watchlistFocus: string[];
+  source: AiModelSource | 'rule-based' | 'backend';
+  generatedAt: string;
+}
+
+export interface AiRuntimeStatus {
+  hasAnyProvider: boolean;
+  preferredProvider: 'auto' | AiModelSource;
+  configuredProviders: AiModelSource[];
+  providerOrder: AiModelSource[];
+  notes: string[];
+  generatedAt: string;
+}
+
 export interface ChatAssistantResponse {
   reply: string;
   followUps: string[];
@@ -213,6 +246,8 @@ export interface ChatAssistantResponse {
   source: AiModelSource | 'rule-based' | 'backend';
   generatedAt: string;
 }
+
+export type AiChatMode = 'general' | 'portfolio' | 'risk' | 'news' | 'execution';
 
 export type AiSentimentResult = SentimentResult;
 

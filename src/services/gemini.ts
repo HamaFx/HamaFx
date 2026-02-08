@@ -3,9 +3,12 @@
 
 import type {
   AiAnalysisResult,
+  AiCommandCenter,
   AiDashboardInsights,
   AiModelSource,
   AiNewsBrief,
+  AiNewsIntel,
+  AiRuntimeStatus,
   MarketSummary,
   SentimentResult,
   TradeEvalResult,
@@ -16,8 +19,11 @@ import { rateLimiter } from '@/services/rateLimiter';
 import { isBackendEnabled } from '@/services/backend/config';
 import {
   apiAiAssetAnalysis,
+  apiAiCommandCenter,
   apiAiInsights,
   apiAiNewsBrief,
+  apiAiNewsIntel,
+  apiAiStatus,
   apiAiSentiment,
   apiAiTradeEval,
 } from '@/services/backend/aiApi';
@@ -145,6 +151,101 @@ export async function getNewsBrief(category: 'all' | 'crypto' | 'forex' | 'econo
     source: 'keyword',
     generatedAt: new Date().toISOString(),
   };
+}
+
+export async function getNewsIntel(category: 'all' | 'crypto' | 'forex' | 'economy' | 'general' = 'all'): Promise<AiNewsIntel> {
+  const cacheKey = `ai_news_intel_${category}`;
+  const cached = cacheService.get<AiNewsIntel>(cacheKey);
+  if (cached) return cached;
+
+  if (isBackendEnabled()) {
+    try {
+      const response = await apiAiNewsIntel({ category, limit: 18 });
+      const normalized: AiNewsIntel = {
+        ...response,
+        source: isAiModelSource(response.source) || response.source === 'keyword'
+          ? response.source
+          : 'backend',
+      };
+      cacheService.set(cacheKey, normalized, 120_000);
+      return normalized;
+    } catch (error) {
+      console.warn('[AI] Backend news intel failed, using local fallback:', error);
+    }
+  }
+
+  return {
+    narrative: 'Narrative engine is unavailable in local mode. Enable backend for regime detection, catalyst clustering, and impact mapping.',
+    regime: 'mixed',
+    catalysts: [],
+    sectorPulse: ['Backend AI required'],
+    assetImpacts: [],
+    riskChecklist: ['Enable backend mode to unlock AI narrative intelligence.'],
+    sentimentScore: 0,
+    source: 'keyword',
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+export async function getCommandCenter(): Promise<AiCommandCenter> {
+  const cacheKey = 'ai_command_center';
+  const cached = cacheService.get<AiCommandCenter>(cacheKey);
+  if (cached) return cached;
+
+  if (isBackendEnabled()) {
+    try {
+      const response = await apiAiCommandCenter();
+      const normalized: AiCommandCenter = {
+        ...response,
+        source: isAiModelSource(response.source) || response.source === 'rule-based'
+          ? response.source
+          : 'backend',
+      };
+      cacheService.set(cacheKey, normalized, 90_000);
+      return normalized;
+    } catch (error) {
+      console.warn('[AI] Backend command center failed, using local fallback:', error);
+    }
+  }
+
+  return {
+    headline: 'Command center unavailable in local mode. Enable backend AI for proactive guidance.',
+    posture: 'neutral',
+    confidence: 45,
+    topActions: ['Enable backend AI mode in Settings.'],
+    blockers: [],
+    opportunities: [],
+    watchlistFocus: [],
+    source: 'rule-based',
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+export async function getAiRuntimeStatus(): Promise<AiRuntimeStatus> {
+  const cacheKey = 'ai_runtime_status';
+  const cached = cacheService.get<AiRuntimeStatus>(cacheKey);
+  if (cached) return cached;
+
+  if (isBackendEnabled()) {
+    try {
+      const status = await apiAiStatus();
+      cacheService.set(cacheKey, status, 45_000);
+      return status;
+    } catch (error) {
+      console.warn('[AI] Backend status failed, using local fallback:', error);
+    }
+  }
+
+  const fallback: AiRuntimeStatus = {
+    hasAnyProvider: false,
+    preferredProvider: 'auto',
+    configuredProviders: [],
+    providerOrder: [],
+    notes: ['Backend mode is disabled. Runtime provider status is unavailable.'],
+    generatedAt: new Date().toISOString(),
+  };
+  cacheService.set(cacheKey, fallback, 20_000);
+  return fallback;
 }
 
 // ===== Market Analysis =====

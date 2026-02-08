@@ -9,6 +9,7 @@ import { rateLimit } from '../../_lib/redis.js';
 
 const requestSchema = z.object({
   message: z.string().min(1).max(2000),
+  mode: z.enum(['general', 'portfolio', 'risk', 'news', 'execution']).optional(),
   history: z.array(
     z.object({
       role: z.enum(['user', 'assistant']),
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
       userId: auth.userId,
       message: parsed.data.message,
       history: parsed.data.history,
+      mode: parsed.data.mode,
     });
 
     const assistantMessage = {
@@ -64,6 +66,7 @@ export async function POST(request: Request) {
     await addAuditEvent(auth.userId, 'AI_ANALYSIS_REQUESTED', 'AI chat response generated', {
       riskLevel: ai.riskLevel,
       source: ai.source,
+      mode: parsed.data.mode ?? 'general',
     });
 
     return ok({
