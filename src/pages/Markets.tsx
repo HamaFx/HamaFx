@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Search, TrendingUp, TrendingDown, Grid3X3, List, RefreshCw, Wifi, WifiOff, Zap } from 'lucide-react';
+import { Search, TrendingUp, TrendingDown, Grid3X3, List, RefreshCw, Wifi, WifiOff, Zap, Clock3 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useMarketStore } from '@/stores/marketStore';
 import { PremiumCard, PremiumBadge, PremiumButton, PremiumInput, TabBar, EmptyState } from '@/components/ui/Premium';
@@ -13,12 +13,18 @@ type SortField = 'name' | 'price' | 'change' | 'volume' | 'marketCap';
 interface MarketRow {
   id: string;
   symbol: string;
+  displaySymbol?: string;
   name: string;
   price: number;
   changePercent: number;
   volume: number;
   marketCap: number;
   assetType: 'crypto' | 'forex';
+  spreadPips?: number;
+  pipMove24h?: number;
+  marketStatus?: string;
+  stale?: boolean;
+  displayPrecision?: number;
   image?: string;
   sparkline?: number[];
 }
@@ -34,14 +40,19 @@ function toMarketRow(asset: Asset): MarketRow {
 
 function forexToMarketRow(pair: ForexPair): MarketRow {
   return {
-    id: pair.id, symbol: pair.symbol, name: pair.name,
+    id: pair.id, symbol: pair.symbol, displaySymbol: pair.displaySymbol ?? pair.symbol, name: pair.name,
     price: pair.rate, changePercent: pair.changePercent24h,
     volume: 0, marketCap: 0, assetType: 'forex',
+    spreadPips: pair.spreadPips,
+    pipMove24h: pair.pipMove24h,
+    marketStatus: pair.marketStatus,
+    stale: pair.stale,
+    displayPrecision: pair.displayPrecision,
   };
 }
 
-function formatPrice(price: number, type: string) {
-  if (type === 'forex') return price.toFixed(4);
+function formatPrice(price: number, type: string, precision?: number) {
+  if (type === 'forex') return price.toFixed(precision ?? 5);
   if (price < 0.01) return price.toFixed(6);
   if (price < 1) return price.toFixed(4);
   if (price > 1000) return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -89,7 +100,17 @@ function MiniSparkline({ data, positive }: { data: number[]; positive: boolean }
 export default function Markets() {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialUrlState = readMarketsUrlState(searchParams);
-  const { cryptoAssets, forexPairs, isLoadingCrypto, wsConnected, dataSource, fetchCrypto, fetchForex } = useMarketStore();
+  const {
+    cryptoAssets,
+    forexPairs,
+    isLoadingCrypto,
+    wsConnected,
+    dataSource,
+    forexDataSource,
+    forexStale,
+    fetchCrypto,
+    fetchForex,
+  } = useMarketStore();
   const [filter, setFilter] = useState<FilterType>(initialUrlState.asset);
   const [search, setSearch] = useState(initialUrlState.q);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>(initialUrlState.view);
@@ -131,7 +152,11 @@ export default function Markets() {
       if (filter !== 'all' && r.assetType !== filter) return false;
       if (search) {
         const q = search.toLowerCase();
-        return r.name.toLowerCase().includes(q) || r.symbol.toLowerCase().includes(q);
+        return (
+          r.name.toLowerCase().includes(q) ||
+          r.symbol.toLowerCase().includes(q) ||
+          (r.displaySymbol?.toLowerCase().includes(q) ?? false)
+        );
       }
       return true;
     })
@@ -167,6 +192,8 @@ export default function Markets() {
           <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
             {allRows.length} assets
             {dataSource !== 'none' && <PremiumBadge variant="default" size="xs">via {dataSource}</PremiumBadge>}
+            {forexDataSource !== 'none' && <PremiumBadge variant="info" size="xs">fx {forexDataSource}</PremiumBadge>}
+            {forexStale && <PremiumBadge variant="warning" size="xs">fx stale</PremiumBadge>}
             {wsConnected && <PremiumBadge variant="success" size="xs" dot pulse>Live</PremiumBadge>}
           </p>
         </div>
@@ -207,12 +234,12 @@ export default function Markets() {
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 font-medium">Top Gainer</p>
-                  <p className="text-sm font-semibold">{topGainer.symbol}</p>
+                  <p className="text-sm font-semibold">{topGainer.displaySymbol ?? topGainer.symbol}</p>
                 </div>
               </div>
               <div className="text-right">
                 <p className="text-sm font-mono font-bold text-emerald-400">+{topGainer.changePercent.toFixed(2)}%</p>
-                <p className="text-xs text-slate-500 font-mono">${formatPrice(topGainer.price, topGainer.assetType)}</p>
+                <p className="text-xs text-slate-500 font-mono">${formatPrice(topGainer.price, topGainer.assetType, topGainer.displayPrecision)}</p>
               </div>
             </div>
           </PremiumCard>
@@ -224,12 +251,12 @@ export default function Markets() {
                 </div>
                 <div>
                   <p className="text-xs text-slate-500 font-medium">Top Loser</p>
-                  <p className="text-sm font-semibold">{topLoser.symbol}</p>
+                  <p className="text-sm font-semibold">{topLoser.displaySymbol ?? topLoser.symbol}</p>
                 </div>
               </div>
               <div className="text-right">
                 <p className="text-sm font-mono font-bold text-red-400">{topLoser.changePercent.toFixed(2)}%</p>
-                <p className="text-xs text-slate-500 font-mono">${formatPrice(topLoser.price, topLoser.assetType)}</p>
+                <p className="text-xs text-slate-500 font-mono">${formatPrice(topLoser.price, topLoser.assetType, topLoser.displayPrecision)}</p>
               </div>
             </div>
           </PremiumCard>
@@ -286,9 +313,9 @@ export default function Markets() {
               Volume {sortField === 'volume' && (sortAsc ? '↑' : '↓')}
             </button>
             <button onClick={() => handleSort('marketCap')} className="text-right hover:text-slate-300 transition-colors">
-              Mkt Cap {sortField === 'marketCap' && (sortAsc ? '↑' : '↓')}
+              Mkt Cap / Pip Δ {sortField === 'marketCap' && (sortAsc ? '↑' : '↓')}
             </button>
-            <span className="text-right">7d</span>
+            <span className="text-right">Trend / Session</span>
           </div>
 
           {/* Rows */}
@@ -311,12 +338,15 @@ export default function Markets() {
                       {row.symbol.substring(0, 2)}
                     </div>
                   )}
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-semibold group-hover:text-white transition-colors">{row.symbol}</p>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-semibold group-hover:text-white transition-colors">{row.displaySymbol ?? row.symbol}</p>
                       <PremiumBadge variant={row.assetType === 'crypto' ? 'warning' : 'info'} size="xs">
                         {row.assetType}
                       </PremiumBadge>
+                      {row.assetType === 'forex' && row.stale && (
+                        <PremiumBadge variant="warning" size="xs">stale</PremiumBadge>
+                      )}
                     </div>
                     <p className="text-xs text-slate-500 truncate max-w-[140px]">{row.name}</p>
                   </div>
@@ -324,7 +354,7 @@ export default function Markets() {
 
                 {/* Price */}
                 <p className="text-sm font-mono font-semibold text-right tabular-nums">
-                  ${formatPrice(row.price, row.assetType)}
+                  ${formatPrice(row.price, row.assetType, row.displayPrecision)}
                 </p>
 
                 {/* Change */}
@@ -338,17 +368,32 @@ export default function Markets() {
 
                 {/* Volume */}
                 <p className="hidden sm:block text-sm text-slate-400 text-right font-mono tabular-nums">
-                  {formatVolume(row.volume)}
+                  {row.assetType === 'forex'
+                    ? row.spreadPips
+                      ? `${row.spreadPips.toFixed(1)} pips`
+                      : '—'
+                    : formatVolume(row.volume)}
                 </p>
 
                 {/* Market Cap */}
                 <p className="hidden sm:block text-sm text-slate-400 text-right font-mono tabular-nums">
-                  {formatMarketCap(row.marketCap)}
+                  {row.assetType === 'forex'
+                    ? Number.isFinite(row.pipMove24h)
+                      ? `${row.pipMove24h?.toFixed(1)} pips`
+                      : '—'
+                    : formatMarketCap(row.marketCap)}
                 </p>
 
                 {/* Sparkline */}
                 <div className="hidden sm:flex justify-end">
-                  {row.sparkline && <MiniSparkline data={row.sparkline} positive={row.changePercent >= 0} />}
+                  {row.assetType === 'forex' ? (
+                    <span className="text-[10px] text-slate-500 flex items-center gap-1">
+                      <Clock3 className="w-3 h-3" />
+                      {(row.marketStatus ?? 'open').replace('_', ' ')}
+                    </span>
+                  ) : (
+                    row.sparkline && <MiniSparkline data={row.sparkline} positive={row.changePercent >= 0} />
+                  )}
                 </div>
               </Link>
             ))}
@@ -389,7 +434,7 @@ export default function Markets() {
                   </div>
                 )}
                 <div>
-                  <p className="text-sm font-bold">{row.symbol}</p>
+                  <p className="text-sm font-bold">{row.displaySymbol ?? row.symbol}</p>
                   <p className="text-xs text-slate-500 truncate max-w-[80px]">{row.name}</p>
                 </div>
               </div>
@@ -401,7 +446,7 @@ export default function Markets() {
                 </div>
               )}
 
-              <p className="text-lg font-mono font-bold tracking-tight">${formatPrice(row.price, row.assetType)}</p>
+              <p className="text-lg font-mono font-bold tracking-tight">${formatPrice(row.price, row.assetType, row.displayPrecision)}</p>
               <div className={cn(
                 'text-sm font-mono font-medium mt-1 flex items-center gap-1',
                 row.changePercent >= 0 ? 'text-emerald-400' : 'text-red-400'
@@ -409,7 +454,11 @@ export default function Markets() {
                 {row.changePercent >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                 {row.changePercent >= 0 ? '+' : ''}{row.changePercent.toFixed(2)}%
               </div>
-              {row.volume > 0 && (
+              {row.assetType === 'forex' ? (
+                <p className="text-xs text-slate-500 mt-1.5 font-mono">
+                  Spread {row.spreadPips?.toFixed(1) ?? '—'} pips · {(row.marketStatus ?? 'open').replace('_', ' ')}
+                </p>
+              ) : row.volume > 0 && (
                 <p className="text-xs text-slate-500 mt-1.5 font-mono">Vol: {formatVolume(row.volume)}</p>
               )}
             </PremiumCard>

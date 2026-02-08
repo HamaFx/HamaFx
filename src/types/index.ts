@@ -44,15 +44,43 @@ export interface OHLCV {
   volume?: number;
 }
 
+export type ForexSessionState = 'open' | 'thin_liquidity' | 'rollover' | 'weekend_closed';
+export type ForexCandleQuality = 'provider_ohlc' | 'derived_close_only';
+export type ForexQuoteSource = 'exchange_rate_api' | 'frankfurter' | 'alpha_vantage' | 'derived';
+
 export interface ForexPair {
   id: string;
   symbol: string;
+  displaySymbol?: string;
   name: string;
   base: string;
   quote: string;
   rate: number;
+  bid?: number;
+  ask?: number;
+  spreadPips?: number;
+  pipMove24h?: number;
   change24h: number;
   changePercent24h: number;
+  pipSize: number;
+  pipetteSize: number;
+  displayPrecision: number;
+  priceStep: number;
+  sessionGroup: string;
+  rank: number;
+  isMajor: boolean;
+  aliases?: string[];
+  source?: ForexQuoteSource;
+  stale?: boolean;
+  marketStatus?: ForexSessionState;
+  sessionLabel?: string;
+  sessionNextTransitionAt?: string;
+  lastUpdated?: string;
+  dataQuality?: ForexCandleQuality | 'spot_quote';
+}
+
+export interface ForexQuote extends ForexPair {
+  mid: number;
 }
 
 // ===== Trading Types =====
@@ -290,7 +318,7 @@ export interface Alert {
   userId: string;
   symbol: string;
   assetType: AssetType;
-  type: 'price_above' | 'price_below' | 'percent_change';
+  type: 'price_above' | 'price_below' | 'percent_change' | 'pip_distance';
   targetValue: number;
   currentValue?: number;
   isTriggered: boolean;

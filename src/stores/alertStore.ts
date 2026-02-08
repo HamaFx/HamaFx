@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { getForexCatalogPair } from '@/config/forexCatalog';
 import type { Alert, AssetType } from '@/types';
 import { useAuthStore } from '@/stores/authStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -124,12 +125,25 @@ export const useAlertStore = create<AlertState>((set, get) => ({
             triggered = pctChange >= alert.targetValue;
           }
           break;
+        case 'pip_distance':
+          if (alert.assetType === 'forex' && alert.currentValue) {
+            const pair = getForexCatalogPair(alert.symbol);
+            const pipSize = pair?.pipSize ?? 0.0001;
+            const pipMove = Math.abs((currentPrice - alert.currentValue) / pipSize);
+            triggered = pipMove >= alert.targetValue;
+          }
+          break;
       }
 
       if (triggered) {
         changed = true;
+        const triggerValueLabel = alert.type === 'percent_change'
+          ? `${alert.targetValue}%`
+          : alert.type === 'pip_distance'
+            ? `${alert.targetValue} pips`
+            : `$${alert.targetValue}`;
         if (notificationSettings.signalAlerts) {
-          showToast('warning', `🔔 Alert Triggered`, `${alert.symbol} ${alert.type.replace('_', ' ')} $${alert.targetValue}`, 6000);
+          showToast('warning', '🔔 Alert Triggered', `${alert.symbol} ${alert.type.replace('_', ' ')} ${triggerValueLabel}`, 6000);
         }
 
         // Browser notification
@@ -139,12 +153,15 @@ export const useAlertStore = create<AlertState>((set, get) => ({
           Notification.permission === 'granted'
         ) {
           new Notification('HamaFX Alert', {
-            body: `${alert.symbol} has ${alert.type.replace('_', ' ')} $${alert.targetValue}`,
+            body: `${alert.symbol} has ${alert.type.replace('_', ' ')} ${triggerValueLabel}`,
             icon: '/favicon.ico',
           });
         }
 
-        useAuthStore.getState().addAuditEntry('ALERT_TRIGGERED', `${alert.symbol} ${alert.type} $${alert.targetValue} triggered at $${currentPrice.toFixed(2)}`);
+        useAuthStore.getState().addAuditEntry(
+          'ALERT_TRIGGERED',
+          `${alert.symbol} ${alert.type} ${triggerValueLabel} triggered at $${currentPrice.toFixed(5)}`
+        );
 
         return {
           ...alert,

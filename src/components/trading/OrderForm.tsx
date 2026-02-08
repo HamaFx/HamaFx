@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { AlertTriangle, TrendingUp, TrendingDown, DollarSign, Info, Bot, Loader2 } from 'lucide-react';
+import { getForexCatalogPair } from '@/config/forexCatalog';
 import { cn } from '@/utils/cn';
 import { usePortfolioStore } from '@/stores/portfolioStore';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -7,6 +8,7 @@ import { isGeminiAvailable } from '@/services/gemini';
 import { evaluateOrderRisk, formatGuardrailError } from '@/services/riskGuardrails';
 import { isBackendOn } from '@/services/backend/config';
 import { apiFetchPortfolio, apiPlaceOrder } from '@/services/backend/tradingApi';
+import { LOT_SIZES, pipsToPrice, roundForexPrice, unitsToLots } from '@/utils/forexMath';
 import toast from 'react-hot-toast';
 import type { OrderSide, OrderType, AssetType, TradeEvalResult } from '@/types';
 
@@ -47,15 +49,27 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
   };
 
   const existingPosition = positions.find(p => p.symbol === symbol);
+  const forexPairMeta = assetType === 'forex' ? getForexCatalogPair(symbol) : undefined;
+  const pricePrecision = forexPairMeta?.displayPrecision ?? (assetType === 'forex' ? 5 : 2);
+  const priceStep = forexPairMeta?.priceStep ?? (assetType === 'forex' ? 0.00001 : 0.01);
+  const quantityStep = assetType === 'forex' ? 1 : 0.000001;
+  const quantityPrecision = assetType === 'forex' ? 0 : 6;
 
   // Calculate quantity from USD or vice versa
-  const effectivePrice = orderType === 'market' ? currentPrice : (parseFloat(limitPrice) || currentPrice);
-  const calcQuantity = amountMode === 'usd'
+  const rawEffectivePrice = orderType === 'market' ? currentPrice : (parseFloat(limitPrice) || currentPrice);
+  const effectivePrice = assetType === 'forex' && forexPairMeta
+    ? roundForexPrice(rawEffectivePrice, forexPairMeta)
+    : rawEffectivePrice;
+  const rawQuantity = amountMode === 'usd'
     ? (parseFloat(amountUSD) || 0) / effectivePrice
     : (parseFloat(quantity) || 0);
+  const calcQuantity = assetType === 'forex'
+    ? Math.max(0, Math.round(rawQuantity / quantityStep) * quantityStep)
+    : rawQuantity;
   const calcTotal = calcQuantity * effectivePrice;
   const feeRate = assetType === 'crypto' ? 0.001 : 0.0001;
   const fee = calcTotal * feeRate;
+  const quantityInStandardLots = assetType === 'forex' ? unitsToLots(calcQuantity, LOT_SIZES.standard) : null;
 
   const riskResult = useMemo(() => evaluateOrderRisk({
     symbol,
@@ -91,16 +105,25 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
       const slPrice = side === 'buy'
         ? currentPrice * (1 - settings.trading.defaultStopLossPercent / 100)
         : currentPrice * (1 + settings.trading.defaultStopLossPercent / 100);
-      setStopLoss(slPrice.toFixed(assetType === 'forex' ? 4 : 2));
+      setStopLoss(slPrice.toFixed(pricePrecision));
     }
     if (settings.trading.defaultTakeProfitPercent > 0 && !takeProfit) {
       const tpPrice = side === 'buy'
         ? currentPrice * (1 + settings.trading.defaultTakeProfitPercent / 100)
         : currentPrice * (1 - settings.trading.defaultTakeProfitPercent / 100);
-      setTakeProfit(tpPrice.toFixed(assetType === 'forex' ? 4 : 2));
+      setTakeProfit(tpPrice.toFixed(pricePrecision));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [pricePrecision]);
+
+  const applyPipPreset = (pips: number) => {
+    if (assetType !== 'forex' || !forexPairMeta) return;
+    const offset = pipsToPrice(pips, forexPairMeta);
+    const sl = side === 'buy' ? effectivePrice - offset : effectivePrice + offset;
+    const tp = side === 'buy' ? effectivePrice + offset : effectivePrice - offset;
+    setStopLoss(roundForexPrice(sl, forexPairMeta).toFixed(pricePrecision));
+    setTakeProfit(roundForexPrice(tp, forexPairMeta).toFixed(pricePrecision));
+  };
 
   const handleSubmit = async () => {
     if (calcQuantity <= 0) {
@@ -187,7 +210,7 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
       }
 
       toast.success(
-        `${side === 'buy' ? '🟢' : '🔴'} ${side.toUpperCase()} ${calcQuantity.toFixed(assetType === 'crypto' ? 6 : 2)} ${symbol} @ $${effectivePrice.toFixed(2)}`,
+        `${side === 'buy' ? '🟢' : '🔴'} ${side.toUpperCase()} ${calcQuantity.toFixed(quantityPrecision)} ${symbol} @ $${effectivePrice.toFixed(pricePrecision)}`,
         { duration: 4000 }
       );
       setAmountUSD('');
@@ -274,7 +297,7 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
         {existingPosition && (
           <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-lg px-3 py-2 text-xs text-indigo-300">
             <Info className="w-3 h-3 inline mr-1" />
-            You have a {existingPosition.side} position: {existingPosition.quantity.toFixed(4)} {symbol} @ ${existingPosition.entryPrice.toFixed(2)}
+            You have a {existingPosition.side} position: {existingPosition.quantity.toFixed(quantityPrecision)} {symbol} @ ${existingPosition.entryPrice.toFixed(pricePrecision)}
             {existingPosition.unrealizedPnL !== 0 && (
               <span className={cn('ml-1', existingPosition.unrealizedPnL > 0 ? 'text-emerald-400' : 'text-red-400')}>
                 ({existingPosition.unrealizedPnL > 0 ? '+' : ''}${existingPosition.unrealizedPnL.toFixed(2)})
@@ -313,8 +336,8 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
               value={limitPrice}
               onChange={e => setLimitPrice(e.target.value)}
               onFocus={(e) => scrollIntoViewOnMobile(e.target)}
-              placeholder={currentPrice.toFixed(2)}
-              step="any"
+              placeholder={currentPrice.toFixed(pricePrecision)}
+              step={String(priceStep)}
               inputMode="decimal"
               enterKeyHint="next"
               aria-invalid={!limitPrice || parseFloat(limitPrice) <= 0}
@@ -350,8 +373,8 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
             value={amountMode === 'usd' ? amountUSD : quantity}
             onChange={e => amountMode === 'usd' ? setAmountUSD(e.target.value) : setQuantity(e.target.value)}
             onFocus={(e) => scrollIntoViewOnMobile(e.target)}
-            placeholder={amountMode === 'usd' ? '1000.00' : `0.00 ${symbol}`}
-            step="any"
+            placeholder={amountMode === 'usd' ? '1000.00' : assetType === 'forex' ? `10000 ${symbol}` : `0.00 ${symbol}`}
+            step={amountMode === 'usd' ? 'any' : String(quantityStep)}
             min="0"
             inputMode="decimal"
             enterKeyHint={showAdvanced ? 'next' : 'done'}
@@ -360,7 +383,11 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
             className="w-full px-3 py-2.5 rounded-lg bg-nexus-elevated border border-nexus-border text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/40 placeholder:text-slate-600"
           />
           <p id="order-amount-help" className="mt-1 text-xs text-slate-500">
-            {amountMode === 'usd' ? 'Enter your position size in USD.' : `Enter units of ${symbol}.`}
+            {amountMode === 'usd'
+              ? 'Enter your position size in USD.'
+              : assetType === 'forex'
+                ? `Enter units of ${symbol} (lot helper available below).`
+                : `Enter units of ${symbol}.`}
           </p>
         </div>
 
@@ -382,6 +409,13 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
             MAX
           </button>
         </div>
+        {assetType === 'forex' && amountMode === 'qty' && (
+          <div className="grid grid-cols-3 gap-1.5">
+            <button onClick={() => setQuantity(String(LOT_SIZES.micro))} className="py-1.5 rounded-md bg-nexus-elevated text-xs text-slate-300">0.01 lot</button>
+            <button onClick={() => setQuantity(String(LOT_SIZES.mini))} className="py-1.5 rounded-md bg-nexus-elevated text-xs text-slate-300">0.10 lot</button>
+            <button onClick={() => setQuantity(String(LOT_SIZES.standard))} className="py-1.5 rounded-md bg-nexus-elevated text-xs text-slate-300">1.00 lot</button>
+          </div>
+        )}
 
         {/* Advanced: SL/TP */}
         <button
@@ -392,38 +426,54 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
         </button>
 
         {showAdvanced && (
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label htmlFor="order-stop-loss" className="text-xs text-slate-500 mb-1 block">Stop Loss</label>
-              <input
-                id="order-stop-loss"
-                name="stopLoss"
-                type="number"
-                value={stopLoss}
-                onChange={e => setStopLoss(e.target.value)}
-                onFocus={(e) => scrollIntoViewOnMobile(e.target)}
-                placeholder="SL Price"
-                step="any"
-                inputMode="decimal"
-                enterKeyHint="next"
-                className="w-full px-3 py-2 rounded-lg bg-nexus-elevated border border-nexus-border text-xs font-mono focus:outline-none focus:ring-2 focus:ring-red-500/40 placeholder:text-slate-600"
-              />
-            </div>
-            <div>
-              <label htmlFor="order-take-profit" className="text-xs text-slate-500 mb-1 block">Take Profit</label>
-              <input
-                id="order-take-profit"
-                name="takeProfit"
-                type="number"
-                value={takeProfit}
-                onChange={e => setTakeProfit(e.target.value)}
-                onFocus={(e) => scrollIntoViewOnMobile(e.target)}
-                placeholder="TP Price"
-                step="any"
-                inputMode="decimal"
-                enterKeyHint="done"
-                className="w-full px-3 py-2 rounded-lg bg-nexus-elevated border border-nexus-border text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/40 placeholder:text-slate-600"
-              />
+          <div className="space-y-2">
+            {assetType === 'forex' && forexPairMeta && (
+              <div className="grid grid-cols-3 gap-1.5">
+                {[10, 25, 50].map((pips) => (
+                  <button
+                    key={pips}
+                    type="button"
+                    onClick={() => applyPipPreset(pips)}
+                    className="py-1.5 rounded-md bg-blue-500/10 text-blue-300 text-xs"
+                  >
+                    {pips} pip SL/TP
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label htmlFor="order-stop-loss" className="text-xs text-slate-500 mb-1 block">Stop Loss</label>
+                <input
+                  id="order-stop-loss"
+                  name="stopLoss"
+                  type="number"
+                  value={stopLoss}
+                  onChange={e => setStopLoss(e.target.value)}
+                  onFocus={(e) => scrollIntoViewOnMobile(e.target)}
+                  placeholder="SL Price"
+                  step={String(priceStep)}
+                  inputMode="decimal"
+                  enterKeyHint="next"
+                  className="w-full px-3 py-2 rounded-lg bg-nexus-elevated border border-nexus-border text-xs font-mono focus:outline-none focus:ring-2 focus:ring-red-500/40 placeholder:text-slate-600"
+                />
+              </div>
+              <div>
+                <label htmlFor="order-take-profit" className="text-xs text-slate-500 mb-1 block">Take Profit</label>
+                <input
+                  id="order-take-profit"
+                  name="takeProfit"
+                  type="number"
+                  value={takeProfit}
+                  onChange={e => setTakeProfit(e.target.value)}
+                  onFocus={(e) => scrollIntoViewOnMobile(e.target)}
+                  placeholder="TP Price"
+                  step={String(priceStep)}
+                  inputMode="decimal"
+                  enterKeyHint="done"
+                  className="w-full px-3 py-2 rounded-lg bg-nexus-elevated border border-nexus-border text-xs font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/40 placeholder:text-slate-600"
+                />
+              </div>
             </div>
           </div>
         )}
@@ -433,11 +483,11 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
           <div className="bg-nexus-elevated rounded-lg p-3 space-y-1.5 text-xs">
             <div className="flex justify-between">
               <span className="text-slate-400">Quantity</span>
-              <span className="font-mono">{calcQuantity.toFixed(assetType === 'crypto' ? 6 : 2)} {symbol}</span>
+              <span className="font-mono">{calcQuantity.toFixed(quantityPrecision)} {symbol}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Price</span>
-              <span className="font-mono">${effectivePrice.toFixed(assetType === 'forex' ? 4 : 2)}</span>
+              <span className="font-mono">${effectivePrice.toFixed(pricePrecision)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-slate-400">Subtotal</span>
@@ -451,6 +501,12 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
               <span className="text-slate-300">Total</span>
               <span className="font-mono">${(calcTotal + fee).toFixed(2)}</span>
             </div>
+            {assetType === 'forex' && quantityInStandardLots !== null && (
+              <div className="flex justify-between">
+                <span className="text-slate-400">Lot Size</span>
+                <span className="font-mono">{quantityInStandardLots.toFixed(3)} lots</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -469,7 +525,7 @@ export default function OrderForm({ symbol, name, assetType, currentPrice, onTra
               <AlertTriangle className="w-3.5 h-3.5" /> Confirm Paper Trade
             </p>
             <p className="text-xs text-slate-400">
-              {side === 'buy' ? 'Buy' : 'Sell'} {calcQuantity.toFixed(4)} {symbol} at ${effectivePrice.toFixed(2)} for ${calcTotal.toFixed(2)}?
+              {side === 'buy' ? 'Buy' : 'Sell'} {calcQuantity.toFixed(quantityPrecision)} {symbol} at ${effectivePrice.toFixed(pricePrecision)} for ${calcTotal.toFixed(2)}?
             </p>
             <div className="flex gap-2">
               <button

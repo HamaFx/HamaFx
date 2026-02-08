@@ -3,15 +3,15 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, TrendingUp, TrendingDown, Bot, BarChart3,
   AlertTriangle, RefreshCw, Clock, DollarSign,
-  Activity, Layers, Star, Bell, ChevronDown
+  Activity, Layers, Star, Bell, ChevronDown, Dot
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { useMarketStore, fetchOHLCVData } from '@/stores/marketStore';
+import { useMarketStore, fetchForexOHLCVSeries, fetchOHLCVData } from '@/stores/marketStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useWatchlistStore } from '@/stores/watchlistStore';
 import { buildIndicatorContext, generateRuleBasedSignal } from '@/services/indicators';
 import { getMarketAnalysis, isGeminiAvailable } from '@/services/gemini';
-import type { OHLCV, AiAnalysisResult, Asset } from '@/types';
+import type { OHLCV, AiAnalysisResult, Asset, ForexCandleQuality, ForexSessionState } from '@/types';
 import TradingChart from '@/components/charts/TradingChart';
 import IndicatorCharts from '@/components/charts/IndicatorCharts';
 import OrderForm from '@/components/trading/OrderForm';
@@ -27,8 +27,8 @@ const TIMEFRAMES: Timeframe[] = [
 
 type ChartType = 'candlestick' | 'line' | 'area';
 
-function formatPrice(price: number, assetType: string) {
-  if (assetType === 'forex') return price.toFixed(4);
+function formatPrice(price: number, assetType: string, precision?: number) {
+  if (assetType === 'forex') return price.toFixed(precision ?? 5);
   if (price < 0.01) return price.toFixed(6);
   if (price < 1) return price.toFixed(4);
   if (price > 1000) return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -68,13 +68,22 @@ export default function AssetDetail() {
   // Find asset
   const cryptoAsset = cryptoAssets.find(a => a.id === id);
   const forexPair = forexPairs.find(p => p.id === id);
-  const asset: (Asset & { assetType: string }) | null = useMemo(() => (
+  const asset: (Asset & {
+    assetType: string;
+    displaySymbol?: string;
+    displayPrecision?: number;
+    spreadPips?: number;
+    marketStatus?: ForexSessionState;
+    sessionLabel?: string;
+    stale?: boolean;
+  }) | null = useMemo(() => (
     cryptoAsset
       ? { ...cryptoAsset, assetType: 'crypto' }
       : forexPair
       ? {
           id: forexPair.id,
           symbol: forexPair.symbol,
+          displaySymbol: forexPair.displaySymbol ?? forexPair.symbol,
           name: forexPair.name,
           assetType: 'forex',
           price: forexPair.rate,
@@ -83,6 +92,11 @@ export default function AssetDetail() {
           high24h: forexPair.rate * 1.002,
           low24h: forexPair.rate * 0.998,
           volume24h: 0,
+          displayPrecision: forexPair.displayPrecision,
+          spreadPips: forexPair.spreadPips,
+          marketStatus: forexPair.marketStatus,
+          sessionLabel: forexPair.sessionLabel,
+          stale: forexPair.stale,
           lastUpdated: new Date().toISOString(),
         }
       : null
@@ -91,6 +105,8 @@ export default function AssetDetail() {
   const [timeframe, setTimeframe] = useState<Timeframe>(TIMEFRAMES[2]); // 1M default
   const [chartType, setChartType] = useState<ChartType>('candlestick');
   const [ohlcv, setOhlcv] = useState<OHLCV[]>([]);
+  const [forexCandleQuality, setForexCandleQuality] = useState<ForexCandleQuality | null>(null);
+  const [forexCandleSource, setForexCandleSource] = useState<string | null>(null);
   const [loadingChart, setLoadingChart] = useState(true);
   const [overlayIndicators, setOverlayIndicators] = useState<string[]>(['SMA20']);
   const [subIndicators, setSubIndicators] = useState<string[]>(['RSI']);
@@ -113,9 +129,23 @@ export default function AssetDetail() {
   useEffect(() => {
     if (!id || !asset) return;
     setLoadingChart(true);
+    if (asset.assetType === 'forex') {
+      fetchForexOHLCVSeries(id, timeframe.days)
+        .then(({ ohlcv: data, meta }) => {
+          setOhlcv(data);
+          setForexCandleQuality(meta.quality);
+          setForexCandleSource(meta.source);
+          setLoadingChart(false);
+        })
+        .catch(() => setLoadingChart(false));
+      return;
+    }
+
     fetchOHLCVData(id, asset.assetType as 'crypto' | 'forex', timeframe.days)
       .then(data => {
         setOhlcv(data);
+        setForexCandleQuality(null);
+        setForexCandleSource(null);
         setLoadingChart(false);
       })
       .catch(() => setLoadingChart(false));
@@ -217,6 +247,13 @@ export default function AssetDetail() {
   }
 
   const isPositive = asset.changePercent24h >= 0;
+  const effectiveChartType: ChartType = (
+    asset.assetType === 'forex' &&
+    forexCandleQuality === 'derived_close_only' &&
+    chartType === 'candlestick'
+  )
+    ? 'line'
+    : chartType;
 
   return (
     <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-4">
@@ -253,15 +290,23 @@ export default function AssetDetail() {
               'w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold',
               asset.assetType === 'crypto' ? 'bg-amber-500/15 text-amber-400' : 'bg-blue-500/15 text-blue-400'
             )}>
-              {asset.symbol.substring(0, 2)}
+              {(asset.displaySymbol ?? asset.symbol).substring(0, 2)}
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl font-bold">{asset.symbol}</h1>
+            <h1 className="text-xl font-bold">{asset.displaySymbol ?? asset.symbol}</h1>
             <p className="text-sm text-slate-400">{asset.name}</p>
+            {asset.assetType === 'forex' && (
+              <p className="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
+                <Dot className="w-3 h-3" />
+                {asset.sessionLabel ?? asset.marketStatus?.replace('_', ' ') ?? 'session'}
+                {asset.spreadPips ? `· spread ${asset.spreadPips.toFixed(1)} pips` : ''}
+                {asset.stale ? '· stale quote' : ''}
+              </p>
+            )}
           </div>
           <div className="text-right">
-            <p className="text-2xl md:text-3xl font-bold font-mono">${formatPrice(asset.price, asset.assetType)}</p>
+            <p className="text-2xl md:text-3xl font-bold font-mono">${formatPrice(asset.price, asset.assetType, asset.displayPrecision)}</p>
             <p className={cn(
               'text-sm font-mono flex items-center gap-1 justify-end',
               isPositive ? 'text-emerald-400' : 'text-red-400'
@@ -269,7 +314,7 @@ export default function AssetDetail() {
               {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
               {isPositive ? '+' : ''}{asset.changePercent24h.toFixed(2)}%
               <span className="text-slate-500 ml-1">
-                ({isPositive ? '+' : ''}${Math.abs(asset.change24h).toFixed(2)})
+                ({isPositive ? '+' : ''}${Math.abs(asset.change24h).toFixed(asset.assetType === 'forex' ? (asset.displayPrecision ?? 5) : 2)})
               </span>
             </p>
           </div>
@@ -278,8 +323,8 @@ export default function AssetDetail() {
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
-            { label: '24h High', value: `$${formatPrice(asset.high24h, asset.assetType)}`, icon: TrendingUp },
-            { label: '24h Low', value: `$${formatPrice(asset.low24h, asset.assetType)}`, icon: TrendingDown },
+            { label: '24h High', value: `$${formatPrice(asset.high24h, asset.assetType, asset.displayPrecision)}`, icon: TrendingUp },
+            { label: '24h Low', value: `$${formatPrice(asset.low24h, asset.assetType, asset.displayPrecision)}`, icon: TrendingDown },
             { label: 'Volume', value: formatVolume(asset.volume24h), icon: BarChart3 },
             { label: 'Market Cap', value: 'marketCap' in asset ? formatMarketCap((asset as Asset).marketCap || 0) : '—', icon: DollarSign },
           ].map(({ label, value, icon: Icon }) => (
@@ -334,6 +379,11 @@ export default function AssetDetail() {
                     </button>
                   ))}
                 </div>
+                {asset.assetType === 'forex' && forexCandleQuality === 'derived_close_only' && (
+                  <span className="text-[10px] text-amber-400">
+                    Close-only history detected, showing line fallback.
+                  </span>
+                )}
 
                 <div className="relative">
                   <button
@@ -383,13 +433,20 @@ export default function AssetDetail() {
               {loadingChart ? (
                 <Shimmer className="w-full h-[400px]" />
               ) : (
-                <TradingChart
-                  data={ohlcv}
-                  chartType={chartType}
-                  indicators={overlayIndicators}
-                  height={Math.min(400, window.innerWidth < 768 ? 300 : 400)}
-                  showVolume={true}
-                />
+                <>
+                  <TradingChart
+                    data={ohlcv}
+                    chartType={effectiveChartType}
+                    indicators={overlayIndicators}
+                    height={Math.min(400, window.innerWidth < 768 ? 300 : 400)}
+                    showVolume={true}
+                  />
+                  {asset.assetType === 'forex' && (
+                    <p className="text-[10px] text-slate-500 mt-2 px-2">
+                      Candle quality: {forexCandleQuality ?? 'n/a'} · source: {forexCandleSource ?? 'n/a'}
+                    </p>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -509,25 +566,25 @@ export default function AssetDetail() {
                       {aiAnalysis.supportLevel && (
                         <div className="bg-nexus-elevated rounded-lg p-2.5">
                           <p className="text-xs text-slate-500">Support</p>
-                          <p className="text-sm font-mono text-emerald-400">${formatPrice(aiAnalysis.supportLevel, asset.assetType)}</p>
+                          <p className="text-sm font-mono text-emerald-400">${formatPrice(aiAnalysis.supportLevel, asset.assetType, asset.displayPrecision)}</p>
                         </div>
                       )}
                       {aiAnalysis.resistanceLevel && (
                         <div className="bg-nexus-elevated rounded-lg p-2.5">
                           <p className="text-xs text-slate-500">Resistance</p>
-                          <p className="text-sm font-mono text-red-400">${formatPrice(aiAnalysis.resistanceLevel, asset.assetType)}</p>
+                          <p className="text-sm font-mono text-red-400">${formatPrice(aiAnalysis.resistanceLevel, asset.assetType, asset.displayPrecision)}</p>
                         </div>
                       )}
                       {aiAnalysis.suggestedStopLoss && (
                         <div className="bg-nexus-elevated rounded-lg p-2.5">
                           <p className="text-xs text-slate-500">Stop Loss</p>
-                          <p className="text-sm font-mono text-red-400">${formatPrice(aiAnalysis.suggestedStopLoss, asset.assetType)}</p>
+                          <p className="text-sm font-mono text-red-400">${formatPrice(aiAnalysis.suggestedStopLoss, asset.assetType, asset.displayPrecision)}</p>
                         </div>
                       )}
                       {aiAnalysis.suggestedTakeProfit && (
                         <div className="bg-nexus-elevated rounded-lg p-2.5">
                           <p className="text-xs text-slate-500">Take Profit</p>
-                          <p className="text-sm font-mono text-emerald-400">${formatPrice(aiAnalysis.suggestedTakeProfit, asset.assetType)}</p>
+                          <p className="text-sm font-mono text-emerald-400">${formatPrice(aiAnalysis.suggestedTakeProfit, asset.assetType, asset.displayPrecision)}</p>
                         </div>
                       )}
                     </div>

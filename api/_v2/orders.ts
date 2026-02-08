@@ -3,6 +3,7 @@ import { requireAuth } from '../_lib/auth.js';
 import { handleApi } from '../_lib/handler.js';
 import { fail, methodNotAllowed, ok, parseJson, unauthorized } from '../_lib/http.js';
 import { handleOptions } from '../_lib/request.js';
+import { getLegacyLatestUsdRatesMap } from '../_lib/forex/service.js';
 import { addAuditEvent, getPortfolio, getSettings, savePortfolio } from '../_lib/state.js';
 import { placeOrder, type PortfolioState } from '../_lib/trading.js';
 
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
     if (!parsed.success) return fail('Invalid order payload', 400, parsed.error.flatten());
 
     const state = (await getPortfolio(auth.userId)) as PortfolioState;
+    const usdRates = await getLegacyLatestUsdRatesMap().catch(() => ({}));
     const settingsData = await getSettings(auth.userId);
     const tradingSettings = (settingsData.trading as Record<string, unknown>) ?? {
       enableRiskGuardrails: true,
@@ -51,6 +53,7 @@ export async function POST(request: Request) {
         maxOpenPositions: Number(tradingSettings.maxOpenPositions ?? 8),
         warnOnConcentration: Boolean(tradingSettings.warnOnConcentration ?? true),
       },
+      usdRates,
       order: parsed.data,
     });
 

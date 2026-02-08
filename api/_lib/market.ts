@@ -1,4 +1,5 @@
 import { withRedisCache } from './redis.js';
+import { getLegacyHistory, getLegacyLatestUsdRatesMap } from './forex/service.js';
 
 const COINGECKO_BASE = 'https://api.coingecko.com/api/v3';
 const COINCAP_BASE = 'https://api.coincap.io/v2';
@@ -38,24 +39,9 @@ export async function getCryptoChart(coinId: string, days: number) {
 }
 
 export async function getForexRates() {
-  return withRedisCache('forex:latest', 20, async () => {
-    const primary = await fetch('https://open.er-api.com/v6/latest/USD');
-    if (primary.ok) {
-      const data = await primary.json();
-      return data.rates ?? {};
-    }
-
-    const fallback = await fetch('https://api.frankfurter.app/latest?from=USD');
-    if (!fallback.ok) throw new Error(`Forex providers failed (${primary.status}, ${fallback.status})`);
-    const data = await fallback.json();
-    return data.rates ?? {};
-  });
+  return getLegacyLatestUsdRatesMap();
 }
 
 export async function getForexHistory(base: string, quote: string, from: string, to: string) {
-  return withRedisCache(`forex:history:${base}:${quote}:${from}:${to}`, 300, async () => {
-    const res = await fetch(`https://api.frankfurter.app/${from}..${to}?from=${base}&to=${quote}`);
-    if (!res.ok) throw new Error(`Forex history failed: ${res.status}`);
-    return res.json();
-  });
+  return getLegacyHistory(base, quote, from, to);
 }

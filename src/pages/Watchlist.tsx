@@ -9,8 +9,8 @@ import { useWatchlistStore } from '@/stores/watchlistStore';
 import { useMarketStore } from '@/stores/marketStore';
 import type { Asset, ForexPair } from '@/types';
 
-function formatPrice(price: number, type: string) {
-  if (type === 'forex') return price.toFixed(4);
+function formatPrice(price: number, type: string, precision?: number) {
+  if (type === 'forex') return price.toFixed(precision ?? 5);
   if (price < 0.01) return price.toFixed(6);
   if (price < 1) return price.toFixed(4);
   if (price > 1000) return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -81,14 +81,18 @@ export default function WatchlistPage() {
 
   // All available assets for adding
   const allAssets = [
-    ...cryptoAssets.map(a => ({ symbol: a.symbol, name: a.name, type: 'crypto' as const, price: a.price, change: a.changePercent24h, image: a.image })),
-    ...forexPairs.map(p => ({ symbol: p.symbol, name: p.name, type: 'forex' as const, price: p.rate, change: p.changePercent24h, image: undefined })),
+    ...cryptoAssets.map(a => ({ symbol: a.symbol, displaySymbol: a.symbol, name: a.name, type: 'crypto' as const, price: a.price, change: a.changePercent24h, image: a.image, precision: undefined as number | undefined })),
+    ...forexPairs.map(p => ({ symbol: p.symbol, displaySymbol: p.displaySymbol ?? p.symbol, name: p.name, type: 'forex' as const, price: p.rate, change: p.changePercent24h, image: undefined, precision: p.displayPrecision })),
   ];
 
   const filteredAssets = allAssets.filter(a => {
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      return a.symbol.toLowerCase().includes(q) || a.name.toLowerCase().includes(q);
+      return (
+        a.symbol.toLowerCase().includes(q) ||
+        (a.displaySymbol?.toLowerCase().includes(q) ?? false) ||
+        a.name.toLowerCase().includes(q)
+      );
     }
     return true;
   }).filter(a => !activeWatchlist?.symbols.some(s => s.symbol === a.symbol));
@@ -250,6 +254,8 @@ export default function WatchlistPage() {
                 const change = isFx ? (assetData as ForexPair).changePercent24h : (assetData as Asset).changePercent24h;
                 const isPositive = change >= 0;
                 const assetId = assetData.id;
+                const displaySymbol = isFx ? (assetData as ForexPair).displaySymbol ?? item.symbol : item.symbol;
+                const precision = isFx ? (assetData as ForexPair).displayPrecision : undefined;
 
                 return (
                   <div key={item.symbol} className="flex items-center justify-between px-5 py-3.5 hover:bg-white/[0.02] transition-colors">
@@ -264,11 +270,11 @@ export default function WatchlistPage() {
                           'w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold',
                           item.assetType === 'crypto' ? 'bg-amber-500/15 text-amber-400' : 'bg-blue-500/15 text-blue-400'
                         )}>
-                          {item.symbol.substring(0, 2)}
+                          {displaySymbol.substring(0, 2)}
                         </div>
                       )}
                       <div>
-                        <p className="text-sm font-medium">{item.symbol}</p>
+                        <p className="text-sm font-medium">{displaySymbol}</p>
                         <p className="text-xs text-slate-500">{assetData.name}</p>
                       </div>
                     </Link>
@@ -277,7 +283,7 @@ export default function WatchlistPage() {
                         <MiniSparkline data={(assetData as Asset).sparkline} positive={isPositive} />
                       )}
                       <div className="text-right min-w-[80px]">
-                        <p className="text-sm font-mono font-medium">${formatPrice(price, item.assetType)}</p>
+                        <p className="text-sm font-mono font-medium">${formatPrice(price, item.assetType, precision)}</p>
                         <p className={cn(
                           'text-xs font-mono flex items-center gap-0.5 justify-end',
                           isPositive ? 'text-emerald-400' : 'text-red-400'
@@ -342,16 +348,16 @@ export default function WatchlistPage() {
                           'w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold',
                           asset.type === 'crypto' ? 'bg-amber-500/15 text-amber-400' : 'bg-blue-500/15 text-blue-400'
                         )}>
-                          {asset.symbol.substring(0, 2)}
+                          {(asset.displaySymbol ?? asset.symbol).substring(0, 2)}
                         </div>
                       )}
                       <div>
-                        <p className="text-sm font-medium">{asset.symbol}</p>
+                        <p className="text-sm font-medium">{asset.displaySymbol ?? asset.symbol}</p>
                         <p className="text-xs text-slate-500">{asset.name}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono">${formatPrice(asset.price, asset.type)}</span>
+                      <span className="text-xs font-mono">${formatPrice(asset.price, asset.type, asset.precision)}</span>
                       <Plus className="w-4 h-4 text-amber-400" />
                     </div>
                   </button>

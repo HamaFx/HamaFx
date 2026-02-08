@@ -10,19 +10,22 @@ Architecture, module boundaries, runtime modes, data flow.
 2. `docs/API_RUNTIME_REFERENCE.md`
 `/api/v2` contracts, auth/session model, env variables, deployment/runtime notes.
 
-3. `docs/AI_CUSTOMIZATION_GUIDE.md`
+3. `docs/FOREX_COMPATIBILITY.md`
+Canonical forex catalog, endpoint contracts, precision/pip/session behavior, fallback policy.
+
+4. `docs/AI_CUSTOMIZATION_GUIDE.md`
 Safe extension patterns for UI, trading logic, AI, news, and backend modules.
 
-4. `docs/V2_BACKEND_SETUP.md`
+5. `docs/V2_BACKEND_SETUP.md`
 Infrastructure setup (Neon/Upstash/Vercel env/migrations).
 
-5. `docs/DEPLOYMENT_HARDENING.md`
+6. `docs/DEPLOYMENT_HARDENING.md`
 Operational hardening, monitoring, and protected deployment automation.
 
-6. `docs/V1_BACKUP_RESTORE.md`
+7. `docs/V1_BACKUP_RESTORE.md`
 V1 backup/restore reference.
 
-7. `docs/AI_VNEXT_IMPLEMENTATION_PLAN.md`
+8. `docs/AI_VNEXT_IMPLEMENTATION_PLAN.md`
 AI architect roadmap and implementation checklist for proactive AI upgrades.
 
 ## Archived Docs

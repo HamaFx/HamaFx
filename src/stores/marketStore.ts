@@ -1,17 +1,29 @@
 import { create } from 'zustand';
-import type { Asset, ForexPair, OHLCV } from '@/types';
+import type { Asset, ForexCandleQuality, ForexPair, OHLCV } from '@/types';
 import { fetchCryptoMarkets, mapCoinGeckoToAsset, fetchCryptoOHLC } from '@/services/api/coinGecko';
 import { fetchCoinCapAssets, mapCoinCapToAsset, connectCoinCapWebSocket } from '@/services/api/coinCap';
-import { fetchForexRates, mapForexRatesToPairs, simulateForexTick, fetchForexHistory, FOREX_PAIRS } from '@/services/api/forex';
+import {
+  fetchForexCandles,
+  fetchForexQuotes,
+  mapForexQuotesToPairs,
+  resolveForexPairById,
+  simulateForexTick,
+} from '@/services/api/forex';
+import { isBackendEnabled } from '@/services/backend/config';
 import { cacheService } from '@/services/cache';
 import { rateLimiter } from '@/services/rateLimiter';
 
+interface ForexSeriesMeta {
+  quality: ForexCandleQuality;
+  source: string;
+  intervalUsed: string;
+  lastUpdated: string;
+}
+
 interface MarketState {
-  // Data
   cryptoAssets: Asset[];
   forexPairs: ForexPair[];
 
-  // Status
   isLoadingCrypto: boolean;
   isLoadingForex: boolean;
   lastCryptoUpdate: string | null;
@@ -19,8 +31,10 @@ interface MarketState {
   wsConnected: boolean;
   error: string | null;
   dataSource: 'coingecko' | 'coincap' | 'cache' | 'none';
+  forexDataSource: string;
+  forexDataQuality: ForexCandleQuality | 'spot_quote' | 'unknown';
+  forexStale: boolean;
 
-  // Actions
   fetchCrypto: () => Promise<void>;
   fetchForex: () => Promise<void>;
   startWebSocket: () => () => void;
@@ -31,9 +45,47 @@ interface MarketState {
 }
 
 const CRYPTO_CACHE_KEY = 'crypto_markets';
-const FOREX_CACHE_KEY = 'forex_rates';
-const CRYPTO_CACHE_TTL = 60_000;  // 60s
-const FOREX_CACHE_TTL = 120_000;  // 2min
+const FOREX_CACHE_KEY = 'forex_quotes';
+const CRYPTO_CACHE_TTL = 60_000;
+const FOREX_CACHE_TTL = 60_000;
+
+async function fetchForexSeries(
+  assetId: string,
+  days: number
+): Promise<{ ohlcv: OHLCV[]; meta: ForexSeriesMeta }> {
+  const pair = resolveForexPairById(assetId);
+  if (!pair) {
+    return {
+      ohlcv: [],
+      meta: {
+        quality: 'derived_close_only',
+        source: 'unknown',
+        intervalUsed: '1d',
+        lastUpdated: new Date().toISOString(),
+      },
+    };
+  }
+
+  const range = `${Math.max(days, 1)}d`;
+  const series = await fetchForexCandles(pair.symbol, '1d', range);
+  const ohlcv: OHLCV[] = series.candles.map((item) => ({
+    time: item.time,
+    open: item.open,
+    high: item.high,
+    low: item.low,
+    close: item.close,
+  }));
+
+  return {
+    ohlcv,
+    meta: {
+      quality: series.quality,
+      source: series.source ?? 'unknown',
+      intervalUsed: series.intervalUsed,
+      lastUpdated: series.lastUpdated,
+    },
+  };
+}
 
 export const useMarketStore = create<MarketState>((set, get) => ({
   cryptoAssets: [],
@@ -45,9 +97,11 @@ export const useMarketStore = create<MarketState>((set, get) => ({
   wsConnected: false,
   error: null,
   dataSource: 'none',
+  forexDataSource: 'none',
+  forexDataQuality: 'unknown',
+  forexStale: false,
 
   fetchCrypto: async () => {
-    // Check cache first
     const cached = cacheService.get<Asset[]>(CRYPTO_CACHE_KEY);
     if (cached && cached.length > 0) {
       set({
@@ -55,14 +109,12 @@ export const useMarketStore = create<MarketState>((set, get) => ({
         lastCryptoUpdate: new Date().toISOString(),
         dataSource: 'cache',
       });
-      // Still try to refresh in background if rate limit allows
       if (!rateLimiter.canMakeRequest('coingecko')) return;
     }
 
     set({ isLoadingCrypto: true, error: null });
 
     try {
-      // Try CoinGecko first (better data: images, sparklines, market cap)
       if (rateLimiter.canMakeRequest('coingecko')) {
         rateLimiter.recordRequest('coingecko');
         const data = await fetchCryptoMarkets(25);
@@ -76,12 +128,11 @@ export const useMarketStore = create<MarketState>((set, get) => ({
         });
         return;
       }
-    } catch (err) {
-      console.warn('[Market] CoinGecko failed, trying CoinCap fallback:', err);
+    } catch (error) {
+      console.warn('[Market] CoinGecko failed, trying CoinCap fallback:', error);
     }
 
     try {
-      // Fallback to CoinCap
       if (rateLimiter.canMakeRequest('coincap')) {
         rateLimiter.recordRequest('coincap');
         const data = await fetchCoinCapAssets(25);
@@ -95,11 +146,10 @@ export const useMarketStore = create<MarketState>((set, get) => ({
         });
         return;
       }
-    } catch (err) {
-      console.warn('[Market] CoinCap also failed:', err);
+    } catch (error) {
+      console.warn('[Market] CoinCap fallback failed:', error);
     }
 
-    // Last resort: use stale cache
     const stale = cacheService.getStale<Asset[]>(CRYPTO_CACHE_KEY);
     if (stale && stale.length > 0) {
       set({
@@ -107,7 +157,7 @@ export const useMarketStore = create<MarketState>((set, get) => ({
         isLoadingCrypto: false,
         lastCryptoUpdate: null,
         dataSource: 'cache',
-        error: 'Using cached data — live API temporarily unavailable',
+        error: 'Using cached crypto data — providers unavailable',
       });
       return;
     }
@@ -119,63 +169,96 @@ export const useMarketStore = create<MarketState>((set, get) => ({
   },
 
   fetchForex: async () => {
-    // Check cache first
     const cached = cacheService.get<ForexPair[]>(FOREX_CACHE_KEY);
     if (cached && cached.length > 0) {
       set({
         forexPairs: cached,
         lastForexUpdate: new Date().toISOString(),
       });
-      if (!rateLimiter.canMakeRequest('exchangerate')) return;
     }
 
     set({ isLoadingForex: true });
 
     try {
-      if (rateLimiter.canMakeRequest('exchangerate')) {
-        rateLimiter.recordRequest('exchangerate');
-        const rates = await fetchForexRates();
-        const pairs = mapForexRatesToPairs(rates);
-        cacheService.set(FOREX_CACHE_KEY, pairs, FOREX_CACHE_TTL);
-        set({
-          forexPairs: pairs,
-          isLoadingForex: false,
-          lastForexUpdate: new Date().toISOString(),
-        });
-        return;
+      if (!isBackendEnabled() && !rateLimiter.canMakeRequest('exchangerate')) {
+        const stale = cacheService.getStale<ForexPair[]>(FOREX_CACHE_KEY);
+        if (stale && stale.length > 0) {
+          set({
+            forexPairs: stale,
+            isLoadingForex: false,
+            forexDataSource: 'cache',
+            forexStale: true,
+          });
+          return;
+        }
       }
-    } catch (err) {
-      console.warn('[Market] Forex fetch failed:', err);
+
+      if (!isBackendEnabled()) {
+        rateLimiter.recordRequest('exchangerate');
+      }
+
+      const quotes = await fetchForexQuotes();
+      const pairs = mapForexQuotesToPairs(quotes);
+
+      cacheService.set(FOREX_CACHE_KEY, pairs, FOREX_CACHE_TTL);
+
+      const source = quotes[0]?.source ?? (isBackendEnabled() ? 'backend' : 'exchange_rate_api');
+      const quality = quotes[0]?.dataQuality ?? 'spot_quote';
+      const stale = quotes.some((quote) => quote.stale);
+
+      set({
+        forexPairs: pairs,
+        isLoadingForex: false,
+        lastForexUpdate: new Date().toISOString(),
+        forexDataSource: source,
+        forexDataQuality: quality,
+        forexStale: stale,
+      });
+      return;
+    } catch (error) {
+      console.warn('[Market] Forex fetch failed:', error);
     }
 
-    // Stale cache fallback
     const stale = cacheService.getStale<ForexPair[]>(FOREX_CACHE_KEY);
     if (stale && stale.length > 0) {
-      set({ forexPairs: stale, isLoadingForex: false });
-    } else {
-      set({ isLoadingForex: false });
+      set({
+        forexPairs: stale,
+        isLoadingForex: false,
+        forexDataSource: 'cache',
+        forexDataQuality: 'unknown',
+        forexStale: true,
+      });
+      return;
     }
+
+    set({ isLoadingForex: false });
   },
 
   startWebSocket: () => {
     const topCryptoIds = [
-      'bitcoin', 'ethereum', 'solana', 'binance-coin', 'ripple',
-      'cardano', 'dogecoin', 'polkadot', 'avalanche-2', 'chainlink',
+      'bitcoin',
+      'ethereum',
+      'solana',
+      'binance-coin',
+      'ripple',
+      'cardano',
+      'dogecoin',
+      'polkadot',
+      'avalanche-2',
+      'chainlink',
     ];
 
     const cleanup = connectCoinCapWebSocket(
       topCryptoIds,
       (prices) => {
         const { cryptoAssets } = get();
-        // Map CoinCap IDs to our asset IDs
         const idMap: Record<string, string> = {
           'binance-coin': 'binancecoin',
           'avalanche-2': 'avalanche-2',
         };
 
-        const updated = cryptoAssets.map(asset => {
-          // CoinCap uses different IDs than CoinGecko — try both
-          const coinCapId = Object.entries(idMap).find(([, v]) => v === asset.id)?.[0] || asset.id;
+        const updated = cryptoAssets.map((asset) => {
+          const coinCapId = Object.entries(idMap).find(([, value]) => value === asset.id)?.[0] || asset.id;
           const newPrice = prices[coinCapId] || prices[asset.id];
 
           if (newPrice && newPrice > 0) {
@@ -188,6 +271,7 @@ export const useMarketStore = create<MarketState>((set, get) => ({
               lastUpdated: new Date().toISOString(),
             };
           }
+
           return asset;
         });
 
@@ -202,48 +286,69 @@ export const useMarketStore = create<MarketState>((set, get) => ({
   },
 
   startForexPolling: () => {
-    // Simulate forex ticks every 3-5 seconds
-    const tickInterval = setInterval(() => {
-      const { forexPairs } = get();
-      if (forexPairs.length === 0) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let localTickTimer: ReturnType<typeof setInterval> | null = null;
 
-      const updated = forexPairs.map(pair => ({
-        ...pair,
-        rate: simulateForexTick(pair.rate),
-      }));
-      set({ forexPairs: updated });
-    }, 3000);
+    const schedule = async () => {
+      if (cancelled) return;
 
-    // Real API poll every 2 minutes
-    const pollInterval = setInterval(() => {
-      get().fetchForex();
-    }, 120_000);
+      await get().fetchForex();
+      const state = get();
+      const marketStatus = state.forexPairs[0]?.marketStatus;
+
+      let nextDelay = 120_000;
+      if (isBackendEnabled()) {
+        if (marketStatus === 'weekend_closed') nextDelay = 600_000;
+        else nextDelay = document.hidden ? 180_000 : 60_000;
+      } else {
+        nextDelay = document.hidden ? 180_000 : 120_000;
+      }
+
+      timer = setTimeout(schedule, nextDelay);
+    };
+
+    schedule();
+
+    if (!isBackendEnabled()) {
+      localTickTimer = setInterval(() => {
+        const { forexPairs } = get();
+        if (forexPairs.length === 0) return;
+
+        const updated = forexPairs.map((pair) => ({
+          ...pair,
+          rate: simulateForexTick(pair.rate),
+        }));
+
+        set({ forexPairs: updated, forexDataQuality: 'spot_quote' });
+      }, 3000);
+    }
 
     return () => {
-      clearInterval(tickInterval);
-      clearInterval(pollInterval);
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      if (localTickTimer) clearInterval(localTickTimer);
     };
   },
 
   updateCryptoPrice: (id: string, price: number) => {
     const { cryptoAssets } = get();
     set({
-      cryptoAssets: cryptoAssets.map(a =>
-        a.id === id ? { ...a, price, lastUpdated: new Date().toISOString() } : a
+      cryptoAssets: cryptoAssets.map((asset) =>
+        asset.id === id ? { ...asset, price, lastUpdated: new Date().toISOString() } : asset
       ),
     });
   },
 
   getAssetById: (id: string) => {
-    return get().cryptoAssets.find(a => a.id === id);
+    return get().cryptoAssets.find((asset) => asset.id === id);
   },
 
   getForexPairById: (id: string) => {
-    return get().forexPairs.find(p => p.id === id);
+    return get().forexPairs.find((pair) => pair.id === id);
   },
 }));
 
-// Utility: fetch OHLCV data for charts (called from components)
 export async function fetchOHLCVData(assetId: string, assetType: 'crypto' | 'forex', days: number): Promise<OHLCV[]> {
   const cacheKey = `ohlcv_${assetId}_${days}`;
   const cached = cacheService.get<OHLCV[]>(cacheKey);
@@ -254,6 +359,7 @@ export async function fetchOHLCVData(assetId: string, assetType: 'crypto' | 'for
       if (!rateLimiter.canMakeRequest('coingecko')) {
         return cacheService.getStale<OHLCV[]>(cacheKey) || [];
       }
+
       rateLimiter.recordRequest('coingecko');
       const data = await fetchCryptoOHLC(assetId, days);
       const ohlcv: OHLCV[] = data.map((item: number[]) => ({
@@ -263,7 +369,8 @@ export async function fetchOHLCVData(assetId: string, assetType: 'crypto' | 'for
         low: item[3],
         close: item[4],
       }));
-      cacheService.set(cacheKey, ohlcv, 300_000); // 5 min cache
+
+      cacheService.set(cacheKey, ohlcv, 300_000);
       return ohlcv;
     } catch {
       return cacheService.getStale<OHLCV[]>(cacheKey) || [];
@@ -272,21 +379,7 @@ export async function fetchOHLCVData(assetId: string, assetType: 'crypto' | 'for
 
   if (assetType === 'forex') {
     try {
-      const pair = FOREX_PAIRS.find(p => p.id === assetId);
-      if (!pair) return [];
-      const history = await fetchForexHistory(pair.base, pair.quote, days);
-      const ohlcv: OHLCV[] = history.map(h => {
-        const ts = Math.floor(new Date(h.date).getTime() / 1000);
-        // Frankfurter gives close prices only — simulate OHLC
-        const spread = h.rate * 0.001;
-        return {
-          time: ts,
-          open: h.rate - spread * (Math.random() - 0.5),
-          high: h.rate + spread * Math.random(),
-          low: h.rate - spread * Math.random(),
-          close: h.rate,
-        };
-      });
+      const { ohlcv } = await fetchForexSeries(assetId, days);
       cacheService.set(cacheKey, ohlcv, 300_000);
       return ohlcv;
     } catch {
@@ -295,4 +388,8 @@ export async function fetchOHLCVData(assetId: string, assetType: 'crypto' | 'for
   }
 
   return [];
+}
+
+export async function fetchForexOHLCVSeries(assetId: string, days: number): Promise<{ ohlcv: OHLCV[]; meta: ForexSeriesMeta }> {
+  return fetchForexSeries(assetId, days);
 }

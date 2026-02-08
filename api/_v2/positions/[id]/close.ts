@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { requireAuth } from '../../../_lib/auth.js';
 import { handleApi } from '../../../_lib/handler.js';
 import { fail, methodNotAllowed, ok, parseJson, unauthorized } from '../../../_lib/http.js';
+import { getLegacyLatestUsdRatesMap } from '../../../_lib/forex/service.js';
 import { handleOptions } from '../../../_lib/request.js';
 import { addAuditEvent, getPortfolio, savePortfolio } from '../../../_lib/state.js';
 import { closePosition, type PortfolioState } from '../../../_lib/trading.js';
@@ -35,11 +36,13 @@ export async function POST(request: Request) {
     if (!parsed.success) return fail('Invalid close payload', 400, parsed.error.flatten());
 
     const state = (await getPortfolio(auth.userId)) as PortfolioState;
+    const usdRates = await getLegacyLatestUsdRatesMap().catch(() => ({}));
     const result = closePosition({
       userId: auth.userId,
       state,
       positionId,
       currentPrice: parsed.data.currentPrice,
+      usdRates,
     });
 
     if (!result.success) return fail(result.error, 400);

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   Bell, Plus, Trash2, X, AlertTriangle,
   TrendingUp, TrendingDown, Percent, CheckCircle2,
-  Clock, ToggleLeft, ToggleRight, BellOff, Volume2
+  Clock, ToggleLeft, ToggleRight, BellOff, Volume2, MoveRight
 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useAlertStore } from '@/stores/alertStore';
@@ -10,7 +10,7 @@ import { useMarketStore } from '@/stores/marketStore';
 import type { AssetType } from '@/types';
 import toast from 'react-hot-toast';
 
-type AlertTypeOption = 'price_above' | 'price_below' | 'percent_change';
+type AlertTypeOption = 'price_above' | 'price_below' | 'percent_change' | 'pip_distance';
 
 export default function AlertsPage() {
   const { alerts, createAlert, deleteAlert, toggleAlert, clearTriggered, checkAlerts } = useAlertStore();
@@ -53,6 +53,11 @@ export default function AlertsPage() {
     if (!targetValue || parseFloat(targetValue) <= 0) {
       setFormError('Target value must be greater than 0.');
       toast.error('Please enter a valid target value');
+      return;
+    }
+    if (alertType === 'pip_distance' && assetType !== 'forex') {
+      setFormError('Pip distance alerts are only available for forex pairs.');
+      toast.error('Select a forex pair for pip alerts');
       return;
     }
     setFormError('');
@@ -157,7 +162,7 @@ export default function AlertsPage() {
               </optgroup>
               <optgroup label="Forex">
                 {forexPairs.map(p => (
-                  <option key={p.symbol} value={p.symbol}>{p.symbol} — {p.rate.toFixed(4)}</option>
+                  <option key={p.symbol} value={p.symbol}>{p.displaySymbol ?? p.symbol} — {p.rate.toFixed(p.displayPrecision ?? 5)}</option>
                 ))}
               </optgroup>
             </select>
@@ -166,11 +171,12 @@ export default function AlertsPage() {
           {/* Alert Type */}
           <div>
             <label className="text-[10px] text-slate-500 uppercase tracking-wider mb-1 block">Condition</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {([
                 { type: 'price_above' as const, icon: TrendingUp, label: 'Price Above' },
                 { type: 'price_below' as const, icon: TrendingDown, label: 'Price Below' },
                 { type: 'percent_change' as const, icon: Percent, label: '% Change' },
+                { type: 'pip_distance' as const, icon: MoveRight, label: 'Pip Move' },
               ]).map(({ type, icon: Icon, label }) => (
                 <button
                   key={type}
@@ -192,14 +198,18 @@ export default function AlertsPage() {
           {/* Target Value */}
           <div>
             <label className="text-[10px] text-slate-500 uppercase tracking-wider mb-1 block">
-              {alertType === 'percent_change' ? 'Percent Change (%)' : 'Target Price ($)'}
+              {alertType === 'percent_change'
+                ? 'Percent Change (%)'
+                : alertType === 'pip_distance'
+                  ? 'Pip Distance'
+                  : 'Target Price ($)'}
             </label>
             <input
               type="number"
               value={targetValue}
               onChange={e => { setTargetValue(e.target.value); if (formError) setFormError(''); }}
               onFocus={(e) => scrollIntoViewOnMobile(e.target)}
-              placeholder={alertType === 'percent_change' ? 'e.g., 5' : 'e.g., 45000'}
+              placeholder={alertType === 'percent_change' ? 'e.g., 5' : alertType === 'pip_distance' ? 'e.g., 35' : 'e.g., 45000'}
               step="any"
               min="0"
               inputMode="decimal"
@@ -283,6 +293,8 @@ export default function AlertsPage() {
                       <TrendingUp className="w-5 h-5 text-emerald-400" />
                     ) : alert.type === 'price_below' ? (
                       <TrendingDown className="w-5 h-5 text-red-400" />
+                    ) : alert.type === 'pip_distance' ? (
+                      <MoveRight className="w-5 h-5 text-blue-400" />
                     ) : (
                       <Percent className="w-5 h-5 text-blue-400" />
                     )}
@@ -302,13 +314,17 @@ export default function AlertsPage() {
                     <p className="text-xs text-slate-400 mt-0.5">
                       {alert.type === 'price_above' ? 'Price goes above' :
                        alert.type === 'price_below' ? 'Price goes below' :
-                       'Changes by'} <span className="font-mono text-slate-300">
-                        {alert.type === 'percent_change' ? `${alert.targetValue}%` : `$${alert.targetValue.toLocaleString()}`}
+                       alert.type === 'percent_change' ? 'Changes by' : 'Moves by'} <span className="font-mono text-slate-300">
+                        {alert.type === 'percent_change'
+                          ? `${alert.targetValue}%`
+                          : alert.type === 'pip_distance'
+                            ? `${alert.targetValue} pips`
+                            : `$${alert.targetValue.toLocaleString()}`}
                       </span>
                     </p>
                     {alert.currentValue && (
                       <p className="text-[10px] text-slate-500 mt-0.5">
-                        Current: ${alert.currentValue.toFixed(2)}
+                        Current: ${alert.currentValue.toFixed(alert.assetType === 'forex' ? 5 : 2)}
                       </p>
                     )}
                   </div>

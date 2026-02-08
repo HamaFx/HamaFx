@@ -67,8 +67,11 @@ Frontend backend client (`src/services/backend/http.ts`) unwraps `data` automati
 
 ## 3.5 Market and News
 
-- `GET /api/v2/market/crypto`
-- `GET /api/v2/market/forex`
+- `GET /api/v2/market/crypto?mode=markets|ohlc|chart`
+- `GET /api/v2/market/forex?mode=latest|history|pairs|quotes|candles` (compatibility route)
+- `GET /api/v2/market/forex/pairs`
+- `GET /api/v2/market/forex/quotes`
+- `GET /api/v2/market/forex/candles`
 - `GET /api/v2/news`
 
 ## 3.6 AI Endpoints
@@ -91,9 +94,9 @@ Frontend backend client (`src/services/backend/http.ts`) unwraps `data` automati
 Public/no auth:
 
 - `GET /api/v2/health`
-- `GET /api/v2/market/crypto`
-- `GET /api/v2/market/forex`
-- `GET /api/v2/news`
+- `POST /api/v2/auth/register`
+- `POST /api/v2/auth/login`
+- `POST /api/v2/auth/refresh`
 
 Cron secret required (not user JWT):
 
@@ -104,7 +107,9 @@ Accepted auth headers:
 
 User JWT required:
 
-- All `/api/v2/auth/*` except `register`, `login`, `refresh`
+- `GET /api/v2/auth/me`
+- `POST /api/v2/auth/logout`
+- All market and news endpoints (`/api/v2/market/*`, `/api/v2/news`)
 - All trading/state/AI endpoints listed in sections 3.3, 3.4, and 3.6
 
 ## 4) Required Environment Variables
@@ -125,6 +130,7 @@ Optional integrations:
 
 - `NEWSDATA_API_KEY`
 - `COINGECKO_API_KEY`
+- `ALPHA_VANTAGE_API_KEY`
 - `GEMINI_API_KEY`
 - `GROQ_API_KEY`
 - `GROQ_MODEL`

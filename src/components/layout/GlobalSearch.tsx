@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, TrendingUp, TrendingDown, X } from 'lucide-react';
+import { getForexCatalogPair, normalizeForexSymbolInput } from '@/config/forexCatalog';
 import { cn } from '@/utils/cn';
 import { useMarketStore } from '@/stores/marketStore';
 
-function formatPrice(price: number, type: string) {
-  if (type === 'forex') return price.toFixed(4);
+function formatPrice(price: number, type: string, precision?: number) {
+  if (type === 'forex') return price.toFixed(precision ?? 5);
   if (price < 0.01) return price.toFixed(6);
   if (price < 1) return price.toFixed(4);
   if (price > 1000) return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -39,18 +40,32 @@ export default function GlobalSearch() {
   const allAssets = [
     ...cryptoAssets.map(a => ({
       id: a.id, symbol: a.symbol, name: a.name, type: 'crypto' as const,
-      price: a.price, change: a.changePercent24h, image: a.image,
+      displaySymbol: a.symbol,
+      price: a.price,
+      change: a.changePercent24h,
+      image: a.image,
+      precision: undefined as number | undefined,
     })),
     ...forexPairs.map(p => ({
       id: p.id, symbol: p.symbol, name: p.name, type: 'forex' as const,
-      price: p.rate, change: p.changePercent24h, image: undefined,
+      displaySymbol: p.displaySymbol ?? p.symbol,
+      price: p.rate, change: p.changePercent24h, image: undefined, precision: p.displayPrecision,
     })),
   ];
 
   const results = query.length > 0
     ? allAssets.filter(a => {
         const q = query.toLowerCase();
-        return a.symbol.toLowerCase().includes(q) || a.name.toLowerCase().includes(q);
+        const normalizedQ = normalizeForexSymbolInput(query);
+        const catalog = getForexCatalogPair(a.symbol);
+        const aliasMatches = catalog?.aliases.some((alias) => alias.toLowerCase().includes(q)) ?? false;
+        return (
+          a.symbol.toLowerCase().includes(q) ||
+          (a.displaySymbol?.toLowerCase().includes(q) ?? false) ||
+          a.name.toLowerCase().includes(q) ||
+          (normalizedQ.length >= 3 && a.symbol.includes(normalizedQ)) ||
+          aliasMatches
+        );
       }).slice(0, 8)
     : allAssets.slice(0, 6);
 
@@ -148,16 +163,16 @@ export default function GlobalSearch() {
                               'w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold',
                               asset.type === 'crypto' ? 'bg-amber-500/15 text-amber-400' : 'bg-blue-500/15 text-blue-400'
                             )}>
-                              {asset.symbol.substring(0, 2)}
+                              {(asset.displaySymbol ?? asset.symbol).substring(0, 2)}
                             </div>
                           )}
                           <div>
-                            <p className="text-sm font-medium">{asset.symbol}</p>
+                            <p className="text-sm font-medium">{asset.displaySymbol ?? asset.symbol}</p>
                             <p className="text-xs text-slate-500">{asset.name}</p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-mono">${formatPrice(asset.price, asset.type)}</p>
+                          <p className="text-sm font-mono">${formatPrice(asset.price, asset.type, asset.precision)}</p>
                           <p className={cn(
                             'text-xs font-mono flex items-center gap-0.5 justify-end',
                             asset.change >= 0 ? 'text-emerald-400' : 'text-red-400'

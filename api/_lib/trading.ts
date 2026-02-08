@@ -1,3 +1,5 @@
+import { getForexCatalogPair } from './forex/catalog.js';
+import { roundForexPrice, toAccountUsdNotional } from './forex/math.js';
 import { evaluateOrderRisk, formatGuardrailError } from './risk.js';
 
 type AssetType = 'crypto' | 'forex';
@@ -74,9 +76,70 @@ export type PortfolioState = {
   balanceHistory: BalanceSnapshot[];
 };
 
-export function calculateTotalValue(state: PortfolioState): number {
+function cloneState(state: PortfolioState): PortfolioState {
+  return {
+    ...state,
+    positions: [...state.positions],
+    orders: [...state.orders],
+    tradeHistory: [...state.tradeHistory],
+    balanceHistory: [...state.balanceHistory],
+  };
+}
+
+function getForexPair(symbol: string, assetType: AssetType) {
+  if (assetType !== 'forex') return undefined;
+  return getForexCatalogPair(symbol);
+}
+
+function normalizePrice(price: number, symbol: string, assetType: AssetType): number {
+  const pair = getForexPair(symbol, assetType);
+  if (!pair) return price;
+  return roundForexPrice(price, pair);
+}
+
+function normalizeQuantity(quantity: number, assetType: AssetType): number {
+  if (assetType === 'forex') {
+    return Math.max(0, Math.round(quantity));
+  }
+  return quantity;
+}
+
+function calculateUsdNotional(
+  quantity: number,
+  price: number,
+  symbol: string,
+  assetType: AssetType,
+  usdRates: Record<string, number>
+): number {
+  const pair = getForexPair(symbol, assetType);
+  if (!pair) return Math.abs(quantity) * price;
+  return toAccountUsdNotional(quantity, price, pair.base, pair.quote, usdRates);
+}
+
+function calculatePnlUsd(
+  quantity: number,
+  entryPrice: number,
+  exitPrice: number,
+  symbol: string,
+  assetType: AssetType,
+  side: 'long' | 'short',
+  usdRates: Record<string, number>
+): number {
+  const entryNotional = calculateUsdNotional(quantity, entryPrice, symbol, assetType, usdRates);
+  const exitNotional = calculateUsdNotional(quantity, exitPrice, symbol, assetType, usdRates);
+  const delta = exitNotional - entryNotional;
+  return side === 'long' ? delta : -delta;
+}
+
+export function calculateTotalValue(state: PortfolioState, usdRates: Record<string, number> = {}): number {
   const exposure = state.positions.reduce((sum, pos) => {
-    const notional = pos.currentPrice * pos.quantity;
+    const notional = calculateUsdNotional(
+      pos.quantity,
+      pos.currentPrice,
+      pos.symbol,
+      pos.assetType,
+      usdRates
+    );
     return sum + (pos.side === 'long' ? notional : -notional);
   }, 0);
   return state.virtualBalance + exposure;
@@ -87,17 +150,33 @@ function calculateFee(total: number, assetType: AssetType): number {
   return Math.round(total * feeRate * 100) / 100;
 }
 
-function applySlippage(price: number, side: OrderSide): number {
+function applySlippage(price: number, side: OrderSide, symbol: string, assetType: AssetType): number {
   const slippagePercent = Math.random() * 0.0004 + 0.0001;
   const slippage = price * slippagePercent;
-  return side === 'buy' ? price + slippage : price - slippage;
+  const slippagePrice = side === 'buy' ? price + slippage : price - slippage;
+  return normalizePrice(slippagePrice, symbol, assetType);
 }
 
-function updatePositionPnL(position: Position): Position {
-  const pnl = position.side === 'long'
-    ? (position.currentPrice - position.entryPrice) * position.quantity
-    : (position.entryPrice - position.currentPrice) * position.quantity;
-  const pnlPercent = position.entryPrice === 0 ? 0 : (pnl / (position.entryPrice * position.quantity)) * 100;
+function updatePositionPnL(position: Position, usdRates: Record<string, number>): Position {
+  const pnl = calculatePnlUsd(
+    position.quantity,
+    position.entryPrice,
+    position.currentPrice,
+    position.symbol,
+    position.assetType,
+    position.side,
+    usdRates
+  );
+
+  const entryNotional = calculateUsdNotional(
+    position.quantity,
+    position.entryPrice,
+    position.symbol,
+    position.assetType,
+    usdRates
+  );
+  const pnlPercent = entryNotional === 0 ? 0 : (pnl / entryNotional) * 100;
+
   return { ...position, unrealizedPnL: pnl, unrealizedPnLPercent: pnlPercent };
 }
 
@@ -105,6 +184,7 @@ export function placeOrder(params: {
   userId: string;
   state: PortfolioState;
   settings: TradingSettings;
+  usdRates?: Record<string, number>;
   order: {
     symbol: string;
     name: string;
@@ -117,16 +197,29 @@ export function placeOrder(params: {
     takeProfit?: number;
   };
 }) {
-  const { state, order } = params;
+  const { state } = params;
+  const usdRates = params.usdRates ?? {};
 
-  if (order.quantity <= 0) return { success: false as const, error: 'Quantity must be greater than 0' };
-  if (order.price <= 0) return { success: false as const, error: 'Invalid price' };
+  const normalizedOrder = {
+    ...params.order,
+    quantity: normalizeQuantity(params.order.quantity, params.order.assetType),
+    price: normalizePrice(params.order.price, params.order.symbol, params.order.assetType),
+    stopLoss: params.order.stopLoss !== undefined
+      ? normalizePrice(params.order.stopLoss, params.order.symbol, params.order.assetType)
+      : undefined,
+    takeProfit: params.order.takeProfit !== undefined
+      ? normalizePrice(params.order.takeProfit, params.order.symbol, params.order.assetType)
+      : undefined,
+  };
+
+  if (normalizedOrder.quantity <= 0) return { success: false as const, error: 'Quantity must be greater than 0' };
+  if (normalizedOrder.price <= 0) return { success: false as const, error: 'Invalid price' };
 
   const risk = evaluateOrderRisk({
-    symbol: order.symbol,
-    side: order.side,
-    quantity: order.quantity,
-    price: order.price,
+    symbol: normalizedOrder.symbol,
+    side: normalizedOrder.side,
+    quantity: normalizedOrder.quantity,
+    price: normalizedOrder.price,
     virtualBalance: state.virtualBalance,
     totalDeposited: state.totalDeposited,
     positions: state.positions,
@@ -144,26 +237,31 @@ export function placeOrder(params: {
 
   const orderId = crypto.randomUUID();
   const now = new Date().toISOString();
-  const nextState: PortfolioState = {
-    ...state,
-    positions: [...state.positions],
-    orders: [...state.orders],
-    tradeHistory: [...state.tradeHistory],
-    balanceHistory: [...state.balanceHistory],
-  };
+  const nextState = cloneState(state);
 
-  if (order.type === 'market') {
-    const filledPrice = applySlippage(order.price, order.side);
-    const filledTotal = order.quantity * filledPrice;
-    const filledFee = calculateFee(filledTotal, order.assetType);
+  if (normalizedOrder.type === 'market') {
+    const filledPrice = applySlippage(
+      normalizedOrder.price,
+      normalizedOrder.side,
+      normalizedOrder.symbol,
+      normalizedOrder.assetType
+    );
+    const filledTotal = calculateUsdNotional(
+      normalizedOrder.quantity,
+      filledPrice,
+      normalizedOrder.symbol,
+      normalizedOrder.assetType,
+      usdRates
+    );
+    const filledFee = calculateFee(filledTotal, normalizedOrder.assetType);
 
     const executedOrder: Order = {
       id: orderId,
-      symbol: order.symbol,
-      assetType: order.assetType,
+      symbol: normalizedOrder.symbol,
+      assetType: normalizedOrder.assetType,
       type: 'market',
-      side: order.side,
-      quantity: order.quantity,
+      side: normalizedOrder.side,
+      quantity: normalizedOrder.quantity,
       price: filledPrice,
       status: 'filled',
       createdAt: now,
@@ -171,39 +269,39 @@ export function placeOrder(params: {
       filledPrice,
     };
 
-    if (order.side === 'buy') {
+    if (normalizedOrder.side === 'buy') {
       if (filledTotal + filledFee > nextState.virtualBalance) {
         return { success: false as const, error: 'Insufficient balance' };
       }
 
-      const existingIndex = nextState.positions.findIndex((p) => p.symbol === order.symbol && p.side === 'long');
+      const existingIndex = nextState.positions.findIndex((p) => p.symbol === normalizedOrder.symbol && p.side === 'long');
       if (existingIndex >= 0) {
         const existing = nextState.positions[existingIndex];
-        const totalQty = existing.quantity + order.quantity;
-        const avgPrice = (existing.entryPrice * existing.quantity + filledPrice * order.quantity) / totalQty;
+        const totalQty = existing.quantity + normalizedOrder.quantity;
+        const avgPrice = (existing.entryPrice * existing.quantity + filledPrice * normalizedOrder.quantity) / totalQty;
         nextState.positions[existingIndex] = updatePositionPnL({
           ...existing,
           quantity: totalQty,
-          entryPrice: avgPrice,
+          entryPrice: normalizePrice(avgPrice, normalizedOrder.symbol, normalizedOrder.assetType),
           currentPrice: filledPrice,
-        });
+        }, usdRates);
       } else {
         nextState.positions.push(
           updatePositionPnL({
             id: crypto.randomUUID(),
-            symbol: order.symbol,
-            name: order.name,
-            assetType: order.assetType,
+            symbol: normalizedOrder.symbol,
+            name: normalizedOrder.name,
+            assetType: normalizedOrder.assetType,
             side: 'long',
-            quantity: order.quantity,
+            quantity: normalizedOrder.quantity,
             entryPrice: filledPrice,
             currentPrice: filledPrice,
             openedAt: now,
-            stopLoss: order.stopLoss,
-            takeProfit: order.takeProfit,
+            stopLoss: normalizedOrder.stopLoss,
+            takeProfit: normalizedOrder.takeProfit,
             unrealizedPnL: 0,
             unrealizedPnLPercent: 0,
-          })
+          }, usdRates)
         );
       }
 
@@ -211,24 +309,38 @@ export function placeOrder(params: {
       nextState.tradeHistory.unshift({
         id: crypto.randomUUID(),
         userId: params.userId,
-        symbol: order.symbol,
-        assetType: order.assetType,
+        symbol: normalizedOrder.symbol,
+        assetType: normalizedOrder.assetType,
         side: 'buy',
         type: 'market',
-        quantity: order.quantity,
+        quantity: normalizedOrder.quantity,
         price: filledPrice,
         total: filledTotal,
         fee: filledFee,
         executedAt: now,
       });
     } else {
-      const longIndex = nextState.positions.findIndex((p) => p.symbol === order.symbol && p.side === 'long');
+      const longIndex = nextState.positions.findIndex((p) => p.symbol === normalizedOrder.symbol && p.side === 'long');
       if (longIndex >= 0) {
         const existing = nextState.positions[longIndex];
-        const sellQty = Math.min(order.quantity, existing.quantity);
-        const sellTotal = sellQty * filledPrice;
-        const sellFee = calculateFee(sellTotal, order.assetType);
-        const pnl = (filledPrice - existing.entryPrice) * sellQty;
+        const sellQty = Math.min(normalizedOrder.quantity, existing.quantity);
+        const sellTotal = calculateUsdNotional(
+          sellQty,
+          filledPrice,
+          normalizedOrder.symbol,
+          normalizedOrder.assetType,
+          usdRates
+        );
+        const sellFee = calculateFee(sellTotal, normalizedOrder.assetType);
+        const pnl = calculatePnlUsd(
+          sellQty,
+          existing.entryPrice,
+          filledPrice,
+          normalizedOrder.symbol,
+          normalizedOrder.assetType,
+          'long',
+          usdRates
+        );
 
         if (sellQty >= existing.quantity) {
           nextState.positions.splice(longIndex, 1);
@@ -237,15 +349,15 @@ export function placeOrder(params: {
             ...existing,
             quantity: existing.quantity - sellQty,
             currentPrice: filledPrice,
-          });
+          }, usdRates);
         }
 
         nextState.virtualBalance += sellTotal - sellFee;
         nextState.tradeHistory.unshift({
           id: crypto.randomUUID(),
           userId: params.userId,
-          symbol: order.symbol,
-          assetType: order.assetType,
+          symbol: normalizedOrder.symbol,
+          assetType: normalizedOrder.assetType,
           side: 'sell',
           type: 'market',
           quantity: sellQty,
@@ -260,30 +372,30 @@ export function placeOrder(params: {
         nextState.positions.push(
           updatePositionPnL({
             id: crypto.randomUUID(),
-            symbol: order.symbol,
-            name: order.name,
-            assetType: order.assetType,
+            symbol: normalizedOrder.symbol,
+            name: normalizedOrder.name,
+            assetType: normalizedOrder.assetType,
             side: 'short',
-            quantity: order.quantity,
+            quantity: normalizedOrder.quantity,
             entryPrice: filledPrice,
             currentPrice: filledPrice,
             openedAt: now,
-            stopLoss: order.stopLoss,
-            takeProfit: order.takeProfit,
+            stopLoss: normalizedOrder.stopLoss,
+            takeProfit: normalizedOrder.takeProfit,
             unrealizedPnL: 0,
             unrealizedPnLPercent: 0,
-          })
+          }, usdRates)
         );
 
         nextState.virtualBalance += filledTotal - filledFee;
         nextState.tradeHistory.unshift({
           id: crypto.randomUUID(),
           userId: params.userId,
-          symbol: order.symbol,
-          assetType: order.assetType,
+          symbol: normalizedOrder.symbol,
+          assetType: normalizedOrder.assetType,
           side: 'sell',
           type: 'market',
-          quantity: order.quantity,
+          quantity: normalizedOrder.quantity,
           price: filledPrice,
           total: filledTotal,
           fee: filledFee,
@@ -294,7 +406,7 @@ export function placeOrder(params: {
 
     nextState.balanceHistory.push({
       timestamp: now,
-      totalValue: calculateTotalValue(nextState),
+      totalValue: calculateTotalValue(nextState, usdRates),
       cashBalance: nextState.virtualBalance,
     });
 
@@ -309,12 +421,12 @@ export function placeOrder(params: {
 
   const pendingOrder: Order = {
     id: orderId,
-    symbol: order.symbol,
-    assetType: order.assetType,
-    type: order.type,
-    side: order.side,
-    quantity: order.quantity,
-    price: order.price,
+    symbol: normalizedOrder.symbol,
+    assetType: normalizedOrder.assetType,
+    type: normalizedOrder.type,
+    side: normalizedOrder.side,
+    quantity: normalizedOrder.quantity,
+    price: normalizedOrder.price,
     status: 'pending',
     createdAt: now,
   };
@@ -334,35 +446,59 @@ export function closePosition(params: {
   state: PortfolioState;
   positionId: string;
   currentPrice: number;
+  usdRates?: Record<string, number>;
 }) {
   const { state, positionId, currentPrice } = params;
+  const usdRates = params.usdRates ?? {};
   const idx = state.positions.findIndex((p) => p.id === positionId);
   if (idx < 0) return { success: false as const, error: 'Position not found' };
 
   const position = state.positions[idx];
+  const normalizedPrice = normalizePrice(currentPrice, position.symbol, position.assetType);
   const now = new Date().toISOString();
-  const total = position.quantity * currentPrice;
+
+  const total = calculateUsdNotional(
+    position.quantity,
+    normalizedPrice,
+    position.symbol,
+    position.assetType,
+    usdRates
+  );
   const fee = calculateFee(total, position.assetType);
 
-  const pnl = position.side === 'long'
-    ? (currentPrice - position.entryPrice) * position.quantity
-    : (position.entryPrice - currentPrice) * position.quantity;
+  const pnl = calculatePnlUsd(
+    position.quantity,
+    position.entryPrice,
+    normalizedPrice,
+    position.symbol,
+    position.assetType,
+    position.side,
+    usdRates
+  );
 
-  const nextState: PortfolioState = {
-    ...state,
-    positions: [...state.positions],
-    orders: [...state.orders],
-    tradeHistory: [...state.tradeHistory],
-    balanceHistory: [...state.balanceHistory],
-  };
+  const nextState = cloneState(state);
 
   nextState.positions.splice(idx, 1);
   if (position.side === 'long') {
     nextState.virtualBalance += total - fee;
   } else {
-    const marginReleased = position.entryPrice * position.quantity;
+    const marginReleased = calculateUsdNotional(
+      position.quantity,
+      position.entryPrice,
+      position.symbol,
+      position.assetType,
+      usdRates
+    );
     nextState.virtualBalance += marginReleased + pnl - fee;
   }
+
+  const entryNotional = calculateUsdNotional(
+    position.quantity,
+    position.entryPrice,
+    position.symbol,
+    position.assetType,
+    usdRates
+  );
 
   const trade: TradeRecord = {
     id: crypto.randomUUID(),
@@ -372,18 +508,18 @@ export function closePosition(params: {
     side: position.side === 'long' ? 'sell' : 'buy',
     type: 'market',
     quantity: position.quantity,
-    price: currentPrice,
+    price: normalizedPrice,
     total,
     fee,
     pnl,
-    pnlPercent: position.entryPrice === 0 ? 0 : (pnl / (position.entryPrice * position.quantity)) * 100,
+    pnlPercent: entryNotional === 0 ? 0 : (pnl / entryNotional) * 100,
     executedAt: now,
   };
 
   nextState.tradeHistory.unshift(trade);
   nextState.balanceHistory.push({
     timestamp: now,
-    totalValue: calculateTotalValue(nextState),
+    totalValue: calculateTotalValue(nextState, usdRates),
     cashBalance: nextState.virtualBalance,
   });
 
