@@ -1,15 +1,41 @@
 import { useEffect, useRef, useState } from 'react';
 import { useChatStore } from '@/stores/chatStore';
 import { useAlertStore } from '@/stores/alertStore';
+import { usePortfolioStore } from '@/stores/portfolioStore';
+import { useMarketStore } from '@/stores/marketStore';
 import { cn } from '@/utils/cn';
 
-type Mood = 'neutral' | 'sleep' | 'thinking' | 'talking' | 'angry' | 'dizzy';
+type Mood = 'neutral' | 'sleep' | 'thinking' | 'talking' | 'angry' | 'dizzy' | 'happy' | 'sad' | 'love' | 'scared';
 
 export function AiCompanion() {
   const { isLoading } = useChatStore();
   const { alerts } = useAlertStore();
+  const { getTotalPnL, tradeHistory } = usePortfolioStore();
+  const { cryptoAssets } = useMarketStore();
+
   const triggeredAlerts = alerts.filter(a => a.isTriggered);
   const hasAlert = triggeredAlerts.length > 0;
+  
+  // PnL Logic
+  const { percent: pnlPercent } = getTotalPnL();
+  const isProfitable = pnlPercent >= 0.5; // +0.5% happy
+  const isLosing = pnlPercent <= -0.5; // -0.5% sad
+
+  // Market Logic
+  const btc = cryptoAssets.find(a => a.symbol === 'BTC');
+  const isMarketCrash = (btc?.changePercent24h ?? 0) <= -4; // BTC down 4% = Scared
+
+  // Trade Logic (Love/Celebrate)
+  const [loveMode, setLoveMode] = useState(false);
+  const prevTradesLen = useRef(tradeHistory.length);
+
+  useEffect(() => {
+    if (tradeHistory.length > prevTradesLen.current) {
+      setLoveMode(true);
+      setTimeout(() => setLoveMode(false), 3000); // 3s Love
+    }
+    prevTradesLen.current = tradeHistory.length;
+  }, [tradeHistory.length]);
 
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [blink, setBlink] = useState(false);
@@ -19,26 +45,30 @@ export function AiCompanion() {
   const containerRef = useRef<HTMLDivElement>(null);
   const sleepTimeout = useRef<number>(0);
 
-  // Derived Mood
+  // Derived Mood Priority
   let mood: Mood = 'neutral';
+  
   if (poked) mood = 'dizzy';
+  else if (loveMode) mood = 'love'; // Trade = Love
   else if (hasAlert) mood = 'angry';
-  else if (isLoading) mood = 'talking'; // Map loading to talking/thinking
+  else if (isLoading) mood = 'talking';
+  else if (isMarketCrash) mood = 'scared';
+  else if (isProfitable) mood = 'happy';
+  else if (isLosing) mood = 'sad';
   else if (!userActive) mood = 'sleep';
 
-  // Activity Tracking (Sleep/Wake)
+  // Activity Tracking
   useEffect(() => {
     const resetSleepTimer = () => {
       setUserActive(true);
       window.clearTimeout(sleepTimeout.current);
-      sleepTimeout.current = window.setTimeout(() => setUserActive(false), 30000); // 30s sleep
+      sleepTimeout.current = window.setTimeout(() => setUserActive(false), 30000);
     };
 
     const handleActivity = (e: MouseEvent | TouchEvent) => {
       resetSleepTimer();
-      
-      // Mouse Tracking logic inside here to save listener count
-      if (e instanceof MouseEvent && containerRef.current && mood === 'neutral') {
+      // Mouse Tracking
+      if (e instanceof MouseEvent && containerRef.current && (mood === 'neutral' || mood === 'happy' || mood === 'sad')) {
         const rect = containerRef.current.getBoundingClientRect();
         const cx = rect.left + rect.width / 2;
         const cy = rect.top + rect.height / 2;
@@ -50,22 +80,20 @@ export function AiCompanion() {
 
     window.addEventListener('mousemove', handleActivity);
     window.addEventListener('click', resetSleepTimer);
-    window.addEventListener('keydown', resetSleepTimer);
     
-    resetSleepTimer(); // Init
+    resetSleepTimer(); 
 
     return () => {
       window.removeEventListener('mousemove', handleActivity);
       window.removeEventListener('click', resetSleepTimer);
-      window.removeEventListener('keydown', resetSleepTimer);
       window.clearTimeout(sleepTimeout.current);
     };
   }, [mood]);
 
-  // Auto Blink (Only when neutral or talking)
+  // Blink
   useEffect(() => {
     const blinkLoop = () => {
-      if (mood === 'neutral' || mood === 'talking') {
+      if (['neutral', 'happy', 'sad', 'talking'].includes(mood)) {
         setBlink(true);
         setTimeout(() => setBlink(false), 150);
       }
@@ -76,7 +104,7 @@ export function AiCompanion() {
   }, [mood]);
 
   const handlePoke = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent opening drawer
+    e.stopPropagation();
     setPoked(true);
     setTimeout(() => setPoked(false), 2000);
   };
@@ -87,14 +115,26 @@ export function AiCompanion() {
       onClick={handlePoke}
       className={cn(
         "relative w-12 h-7 rounded-full flex items-center justify-center gap-1.5 transition-all duration-500 border shadow-lg overflow-hidden cursor-pointer",
-        // Mood Styles
+        // Neutral
         mood === 'neutral' && "bg-[#09090b] border-[#27272a] shadow-indigo-500/10",
+        // Sleep
         mood === 'sleep' && "bg-[#050505] border-[#1a1a1a] opacity-70 scale-95",
+        // Talking
         mood === 'talking' && "bg-indigo-950 border-indigo-500/50 w-14 shadow-indigo-500/30",
+        // Angry (Alert)
         mood === 'angry' && "bg-red-950 border-red-500/50 shadow-red-500/20",
-        mood === 'dizzy' && "bg-purple-950 border-purple-500/50 animate-shake"
+        // Dizzy (Poke)
+        mood === 'dizzy' && "bg-purple-950 border-purple-500/50 animate-shake",
+        // Happy (Profit)
+        mood === 'happy' && "bg-emerald-950 border-emerald-500/50 shadow-emerald-500/20",
+        // Sad (Loss)
+        mood === 'sad' && "bg-rose-950 border-rose-500/50 shadow-rose-500/10",
+        // Love (Trade)
+        mood === 'love' && "bg-pink-950 border-pink-500/50 shadow-pink-500/30 animate-[bounce_0.5s_infinite]",
+        // Scared (Crash)
+        mood === 'scared' && "bg-amber-950 border-amber-500/50 animate-shake shadow-amber-500/20"
       )}
-      title={mood.toUpperCase()}
+      title={`AI Status: ${mood.toUpperCase()}`}
     >
       {/* Eyes */}
       {[0, 1].map((i) => (
@@ -104,26 +144,35 @@ export function AiCompanion() {
             "bg-white transition-all duration-300 ease-out will-change-transform",
             "w-1.5 h-1.5 rounded-full",
             
-            // Mood: Sleep (Line)
+            // Sleep
             mood === 'sleep' && "h-[1px] w-2 opacity-50",
 
-            // Mood: Talking (Waveform Bars)
-            mood === 'talking' && [
-              "w-1.5 h-3 rounded-full animate-[bounce_0.4s_infinite]",
-              i === 1 && "animation-delay-100"
-            ],
+            // Talking
+            mood === 'talking' && ["w-1.5 h-3 rounded-full animate-[bounce_0.4s_infinite]", i === 1 && "animation-delay-100"],
 
-            // Mood: Angry (Slanted)
+            // Angry
             mood === 'angry' && (i === 0 ? "rotate-12 h-2 w-1 rounded-sm bg-red-200" : "-rotate-12 h-2 w-1 rounded-sm bg-red-200"),
 
-            // Mood: Dizzy (Spinning & Different Color)
+            // Dizzy
             mood === 'dizzy' && "w-2 h-2 bg-pink-300 rounded-none animate-spin",
 
-            // Blink Override
+            // Happy (Inverted U)
+            mood === 'happy' && "h-1 w-2 rounded-t-full bg-emerald-200 translate-y-[-1px]",
+
+            // Sad (Slanted lines / \)
+            mood === 'sad' && (i === 0 ? "-rotate-12 h-[2px] w-2 bg-rose-200" : "rotate-12 h-[2px] w-2 bg-rose-200"),
+
+            // Love (Hearts or Pink)
+            mood === 'love' && "w-2 h-2 bg-pink-300 rounded-full scale-125",
+
+            // Scared (Tall Ovals)
+            mood === 'scared' && "h-3 w-1.5 rounded-full bg-amber-200",
+
+            // Blink
             blink && mood !== 'sleep' && "scale-y-[0.1]"
           )}
           style={{
-            transform: mood === 'neutral' 
+            transform: (['neutral', 'happy', 'sad'].includes(mood))
               ? `translate(${mousePos.x}px, ${mousePos.y}px) scaleY(${blink ? 0.1 : 1})`
               : undefined
           }}
