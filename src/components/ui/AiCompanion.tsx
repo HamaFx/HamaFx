@@ -15,7 +15,7 @@ const TIPS = [
   "Stay disciplined"
 ];
 
-export function AiCompanion() {
+export function AiCompanion({ compact = false }: { compact?: boolean }) {
   const { isLoading } = useChatStore();
   const { alerts } = useAlertStore();
   const { getTotalPnL, tradeHistory } = usePortfolioStore();
@@ -52,6 +52,7 @@ export function AiCompanion() {
 
   // Trade Celebration
   useEffect(() => {
+    if (compact) return;
     if (tradeHistory.length > prevTradesLen.current) {
       setLoveMode(true);
       setMessage("Order Placed! 🚀");
@@ -64,10 +65,11 @@ export function AiCompanion() {
       }, 3000);
     }
     prevTradesLen.current = tradeHistory.length;
-  }, [tradeHistory.length]);
+  }, [compact, tradeHistory.length]);
 
   // Alert Bubble
   useEffect(() => {
+    if (compact) return;
     if (triggeredAlerts.length > prevAlertsLen.current) {
       const last = triggeredAlerts[0];
       // Format: BTC ↑ 95000
@@ -79,10 +81,11 @@ export function AiCompanion() {
       alertMessageTimeout.current = window.setTimeout(() => setMessage(null), 5000);
     }
     prevAlertsLen.current = triggeredAlerts.length;
-  }, [triggeredAlerts]);
+  }, [compact, triggeredAlerts]);
 
   // Random Tips (Rarely)
   useEffect(() => {
+    if (compact) return;
     const interval = setInterval(() => {
       if (Math.random() > 0.9 && !message && userActive && !isLoading) { // 10% chance every 30s
         const tip = TIPS[Math.floor(Math.random() * TIPS.length)];
@@ -99,7 +102,7 @@ export function AiCompanion() {
         window.clearTimeout(tipMessageTimeout.current);
       }
     };
-  }, [message, userActive, isLoading]);
+  }, [compact, message, userActive, isLoading]);
 
   // Derived Mood Priority
   let mood: Mood = 'neutral';
@@ -172,6 +175,7 @@ export function AiCompanion() {
   }, [mood]);
 
   const handlePoke = (e: React.MouseEvent) => {
+    if (compact) return;
     e.stopPropagation();
     setPoked(true);
     setMessage("Ouch! 😵‍💫");
@@ -194,7 +198,7 @@ export function AiCompanion() {
     <div className="relative flex items-center">
       
       {/* Speech Bubble */}
-      {message && (
+      {!compact && message && (
         <div className="absolute right-full mr-3 px-2.5 py-1.5 bg-nexus-elevated border border-nexus-border rounded-lg text-xs font-medium whitespace-nowrap animate-in slide-in-from-right-2 fade-in duration-200 shadow-lg text-white">
           {message}
           {/* Arrow */}
@@ -207,7 +211,8 @@ export function AiCompanion() {
         ref={containerRef}
         onClick={handlePoke}
         className={cn(
-          "relative w-12 h-7 rounded-full flex items-center justify-center gap-1.5 transition-all duration-500 border shadow-lg overflow-hidden cursor-pointer",
+          "relative w-12 h-7 rounded-full flex items-center justify-center gap-1.5 transition-all duration-500 border shadow-lg overflow-hidden",
+          compact ? "cursor-default" : "cursor-pointer",
           // Neutral
           mood === 'neutral' && "bg-[#09090b] border-[#27272a] shadow-indigo-500/10",
           // Sleep

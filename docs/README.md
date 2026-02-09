@@ -28,6 +28,9 @@ V1 backup/restore reference.
 8. `docs/AI_VNEXT_IMPLEMENTATION_PLAN.md`
 AI architect roadmap and implementation checklist for proactive AI upgrades.
 
+9. `docs/CHANGELOG_GEMINI_AND_RECENT.md`
+Audit trail of `gemini-agent-dev` merge work plus recent layout stabilization updates.
+
 ## Archived Docs
 
 Historical and superseded planning docs were moved to `docs/archive/`.

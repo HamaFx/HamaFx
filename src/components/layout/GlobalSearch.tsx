@@ -140,6 +140,15 @@ export default function GlobalSearch({
     return () => window.removeEventListener('keydown', handler);
   }, [open]);
 
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
+
   const commandActions = useMemo<CommandAction[]>(
     () => [
       {

@@ -14,7 +14,6 @@ import {
   X,
   Sun,
   Moon,
-  ChevronRight,
   Grid3X3,
   Bell,
   Shield,
@@ -187,6 +186,7 @@ function NavItem({
           cn(
             'group/nav relative flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-200 overflow-hidden',
             collapsed ? 'justify-center px-2 py-2.5 w-full' : 'px-3 py-2.5 w-full',
+            showPin && !collapsed && 'pr-9',
             isActive
               ? 'bg-indigo-500/10 text-indigo-400 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.2)]'
               : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
@@ -209,7 +209,6 @@ function NavItem({
                 <span className={cn('truncate', isActive && 'translate-x-1 transition-transform')}>
                   {item.label}
                 </span>
-                {isActive && <ChevronRight className="w-3.5 h-3.5 ml-auto opacity-50" />}
               </>
             )}
           </>
@@ -389,10 +388,27 @@ export function Layout() {
 
   const groupedNav = useMemo(
     () =>
-      navGroups.map((group) => ({
-        ...group,
-        items: navItems.filter((item) => item.group === group.id),
-      })),
+      navGroups
+        .map((group) => ({
+          ...group,
+          items: navItems.filter(
+            (item) =>
+              item.group === group.id &&
+              (sidebarCollapsed || !favoriteRoutes.includes(item.to))
+          ),
+        }))
+        .filter((group) => group.items.length > 0),
+    [favoriteRoutes, sidebarCollapsed]
+  );
+
+  const groupedNavMobile = useMemo(
+    () =>
+      navGroups
+        .map((group) => ({
+          ...group,
+          items: navItems.filter((item) => item.group === group.id),
+        }))
+        .filter((group) => group.items.length > 0),
     []
   );
 
@@ -417,6 +433,18 @@ export function Layout() {
   useEffect(() => {
     window.localStorage.setItem(SIDEBAR_COLLAPSE_KEY, sidebarCollapsed ? '1' : '0');
   }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const handleResize = () => {
+      if (window.innerWidth >= 768 && sidebarOpen) {
+        setSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [sidebarOpen]);
 
   useEffect(() => {
     const route = location.pathname.startsWith('/asset/') ? '/markets' : location.pathname;
@@ -582,7 +610,7 @@ export function Layout() {
               </div>
 
               <nav className="flex-1 px-3 py-4 overflow-y-auto">
-                {groupedNav.map((group) => (
+                {groupedNavMobile.map((group) => (
                   <section key={`mobile-${group.id}`} className="mb-3">
                     <p className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold px-2 mb-1.5">{group.label}</p>
                     <div className="space-y-0.5">
@@ -610,8 +638,8 @@ export function Layout() {
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <header className="border-b border-nexus-border bg-nexus-card/70 backdrop-blur-md shrink-0">
             <div className="h-14 md:h-16 px-4 md:px-6">
-              <div className="grid w-full h-full items-center gap-3 grid-cols-[auto,minmax(0,1fr),auto]">
-                <div className="flex items-center gap-3 min-w-0">
+              <div className="w-full h-full flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0 flex-1 lg:max-w-[380px]">
                   <button
                     type="button"
                     onClick={() => setSidebarOpen(true)}
@@ -627,13 +655,13 @@ export function Layout() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-slate-100 truncate">{pageMeta.title}</p>
-                      <p className="hidden lg:block text-xs text-slate-500 truncate">{pageMeta.subtitle}</p>
+                      <p className="hidden xl:block text-xs text-slate-500 truncate">{pageMeta.subtitle}</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="min-w-0 flex items-center justify-center">
-                  <div className="w-full max-w-2xl">
+                <div className="hidden sm:flex min-w-0 flex-1 items-center justify-center">
+                  <div className="w-full max-w-xl">
                     <GlobalSearch
                       onAskAi={() => openChat()}
                       onCreateAlert={() => navigate('/alerts')}
@@ -642,19 +670,13 @@ export function Layout() {
                   </div>
                 </div>
 
-                <div className="justify-self-end flex items-center gap-2">
-                  <div className="hidden 2xl:block">
-                    <MiniTicker />
-                  </div>
-
-                  <div className="hidden lg:flex items-center gap-2">
-                    <div className={cn('hidden xl:flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium', forexSessionTone)}>
-                      <Clock3 className="w-3.5 h-3.5" />
-                      <span>{forexSession}</span>
-                    </div>
-                    <div className={cn('hidden lg:flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold', riskPosture.tone)}>
-                      {riskPosture.label}
-                    </div>
+                <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                  <div className="sm:hidden">
+                    <GlobalSearch
+                      onAskAi={() => openChat()}
+                      onCreateAlert={() => navigate('/alerts')}
+                      onCreateOrder={() => navigate('/asset/bitcoin')}
+                    />
                   </div>
 
                   <button
@@ -678,6 +700,7 @@ export function Layout() {
                         : 'bg-white/5 text-slate-300 border-transparent hover:bg-white/10'
                     )}
                     aria-label="Ask AI Copilot"
+                    title={aiMetaLabel}
                     data-testid="desktop-ai-chat-toggle"
                   >
                     <span
@@ -686,34 +709,49 @@ export function Layout() {
                         aiLoading ? 'bg-violet-300 animate-pulse' : aiConnected ? 'bg-emerald-400' : 'bg-slate-500'
                       )}
                     />
-                    <span className="hidden sm:inline">Ask AI</span>
-                    <AiCompanion />
-                    <span className="hidden xl:inline text-[11px] text-slate-500">{aiMetaLabel}</span>
+                    <span className="hidden lg:inline">Ask AI</span>
+                    <AiCompanion compact />
+                    <span className="hidden 2xl:inline text-[11px] text-slate-500">{aiMetaLabel}</span>
                   </button>
                 </div>
               </div>
             </div>
 
-            {secondaryLinks.length > 0 && (
-              <div className="px-4 md:px-6 pb-2">
-                <nav className="flex items-center gap-2 overflow-x-auto hide-scrollbar">
-                  {secondaryLinks.map((link) => (
-                    <Link
-                      key={link.label}
-                      to={link.to}
-                      className={cn(
-                        'whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium border transition-colors',
-                        link.active
-                          ? 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
-                          : 'bg-white/5 text-slate-400 border-transparent hover:text-slate-200 hover:bg-white/10'
-                      )}
-                    >
-                      {link.label}
-                    </Link>
-                  ))}
-                </nav>
+            <div className="px-4 md:px-6 pb-2">
+              <div className="flex items-center gap-2 flex-wrap md:flex-nowrap">
+                {secondaryLinks.length > 0 && (
+                  <nav className="flex items-center gap-2 overflow-x-auto hide-scrollbar flex-1 min-w-0">
+                    {secondaryLinks.map((link) => (
+                      <Link
+                        key={link.label}
+                        to={link.to}
+                        className={cn(
+                          'whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium border transition-colors',
+                          link.active
+                            ? 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30'
+                            : 'bg-white/5 text-slate-400 border-transparent hover:text-slate-200 hover:bg-white/10'
+                        )}
+                      >
+                        {link.label}
+                      </Link>
+                    ))}
+                  </nav>
+                )}
+
+                <div className={cn('flex items-center gap-2 ml-auto', secondaryLinks.length === 0 && 'w-full justify-end')}>
+                  <div className={cn('hidden md:flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium', forexSessionTone)}>
+                    <Clock3 className="w-3.5 h-3.5" />
+                    <span>{forexSession}</span>
+                  </div>
+                  <div className={cn('hidden md:flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold', riskPosture.tone)}>
+                    {riskPosture.label}
+                  </div>
+                  <div className="hidden xl:block">
+                    <MiniTicker />
+                  </div>
+                </div>
               </div>
-            )}
+            </div>
           </header>
 
           <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0">
@@ -721,6 +759,12 @@ export function Layout() {
               <Outlet />
             </PageTransition>
           </main>
+
+          <div className="hidden md:block border-t border-nexus-border bg-nexus-card/70 backdrop-blur px-4 py-1.5">
+            <p className="text-xs text-slate-600 text-center">
+              ⚠️ Paper trading only. Not financial advice. AI signals are for educational purposes. Past performance ≠ future results.
+            </p>
+          </div>
         </div>
 
         <nav className="md:hidden fixed bottom-0 left-0 right-0 h-[calc(4rem+env(safe-area-inset-bottom))] pb-[max(0.5rem,env(safe-area-inset-bottom))] bg-nexus-card border-t border-nexus-border flex items-center justify-around px-2 z-40">
@@ -750,24 +794,16 @@ export function Layout() {
           <button
             type="button"
             onClick={() => openChat()}
-            className="md:hidden fixed right-4 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg shadow-purple-500/25 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform bottom-[calc(5.25rem+env(safe-area-inset-bottom))]"
+            className={cn(
+              'md:hidden fixed right-4 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg shadow-purple-500/25 items-center justify-center hover:scale-105 active:scale-95 transition-transform bottom-[calc(5.25rem+env(safe-area-inset-bottom))]',
+              sidebarOpen ? 'hidden' : 'flex'
+            )}
             aria-label="Open AI Chat"
             data-testid="mobile-ai-chat-toggle"
           >
             <MessageCircle className="w-6 h-6" />
           </button>
         )}
-
-        <div
-          className={cn(
-            'hidden md:block fixed bottom-0 right-0 px-4 py-1.5 bg-nexus-card/80 backdrop-blur border-t border-nexus-border z-30 transition-[left] duration-300',
-            sidebarCollapsed ? 'left-[4.75rem]' : 'left-64'
-          )}
-        >
-          <p className="text-xs text-slate-600 text-center">
-            ⚠️ Paper trading only. Not financial advice. AI signals are for educational purposes. Past performance ≠ future results.
-          </p>
-        </div>
       </div>
     </>
   );
