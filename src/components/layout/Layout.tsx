@@ -91,7 +91,7 @@ export function Layout() {
   return (
     <>
       <a href="#main-content" className="skip-link">Skip to main content</a>
-      <div className="flex h-screen overflow-hidden bg-nexus-bg">
+      <div className="flex h-screen overflow-hidden">
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-60 border-r border-nexus-border bg-nexus-card shrink-0">
         {/* Logo */}
