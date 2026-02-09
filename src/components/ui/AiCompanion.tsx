@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useChatStore } from '@/stores/chatStore';
 import { useAlertStore } from '@/stores/alertStore';
 import { cn } from '@/utils/cn';
@@ -9,49 +9,80 @@ export function AiCompanion() {
   const triggeredAlerts = alerts.filter(a => a.isTriggered);
   const hasAlert = triggeredAlerts.length > 0;
 
-  // Random "blink" effect
-  const [blinking, setBlinking] = useState(false);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [blink, setBlink] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
+  // State Logic
+  const mood = isLoading ? 'thinking' : hasAlert ? 'angry' : 'neutral';
+
+  // Mouse Tracking
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (Math.random() > 0.7) {
-        setBlinking(true);
-        setTimeout(() => setBlinking(false), 150);
-      }
-    }, 3000);
-    return () => clearInterval(interval);
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      
+      // Calculate offset (clamped)
+      const dx = Math.max(-1, Math.min(1, (e.clientX - cx) / 100));
+      const dy = Math.max(-1, Math.min(1, (e.clientY - cy) / 100));
+      
+      setMousePos({ x: dx * 3, y: dy * 2 }); // Scale movement
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
   }, []);
 
-  // Determine State
-  const state = isLoading ? 'thinking' : hasAlert ? 'alert' : 'idle';
+  // Auto Blink
+  useEffect(() => {
+    const blinkLoop = () => {
+      if (mood === 'neutral') {
+        setBlink(true);
+        setTimeout(() => setBlink(false), 150);
+      }
+      setTimeout(blinkLoop, Math.random() * 3000 + 2000);
+    };
+    const timer = setTimeout(blinkLoop, 2000);
+    return () => clearTimeout(timer);
+  }, [mood]);
 
   return (
-    <div className="relative w-6 h-6 flex items-center justify-center" title="AI System Online">
-      
-      {/* Outer Ring (Orbit) - Brighter & Solid */}
-      <div className={cn(
-        "absolute inset-0 rounded-full border-2 transition-all duration-500",
-        state === 'idle' && "border-indigo-400/40 border-t-indigo-400 w-full h-full animate-[spin_3s_linear_infinite]",
-        state === 'thinking' && "border-purple-400/60 border-t-purple-400 border-r-purple-400 w-full h-full animate-[spin_1s_linear_infinite]",
-        state === 'alert' && "border-red-500 border-dashed w-full h-full animate-none"
-      )} />
-
-      {/* Inner Glow (Aura) - Stronger */}
-      <div className={cn(
-        "absolute w-full h-full rounded-full blur-md transition-colors duration-500 opacity-50",
-        state === 'idle' && "bg-indigo-500 animate-pulse",
-        state === 'thinking' && "bg-purple-600 animate-pulse",
-        state === 'alert' && "bg-red-600 animate-pulse"
-      )} />
-
-      {/* Core (The Eye) - Distinct */}
-      <div className={cn(
-        "relative w-2.5 h-2.5 rounded-full transition-all duration-300 z-10",
-        state === 'idle' && "bg-indigo-100 shadow-[0_0_10px_rgba(99,102,241,1)]",
-        state === 'thinking' && "bg-purple-100 shadow-[0_0_15px_rgba(168,85,247,1)] scale-110",
-        state === 'alert' && "bg-red-100 shadow-[0_0_15px_rgba(239,68,68,1)]",
-        blinking && "scale-y-0 duration-75"
-      )} />
+    <div 
+      ref={containerRef}
+      className={cn(
+        "relative w-12 h-7 rounded-full flex items-center justify-center gap-1.5 transition-colors duration-300 border",
+        mood === 'neutral' && "bg-[#09090b] border-[#27272a]",
+        mood === 'thinking' && "bg-indigo-950 border-indigo-500/50",
+        mood === 'angry' && "bg-red-950 border-red-500/50"
+      )}
+      title={mood === 'thinking' ? "Thinking..." : mood === 'angry' ? "Alert Triggered!" : "AI Online"}
+    >
+      {/* Eyes */}
+      {[0, 1].map((i) => (
+        <div
+          key={i}
+          className={cn(
+            "bg-white transition-all duration-300 ease-out will-change-transform",
+            // Base Shape
+            "w-1.5 h-1.5 rounded-full",
+            // Mood: Neutral (Circle)
+            mood === 'neutral' && "w-1.5 h-1.5",
+            // Mood: Thinking (Squint/Happy ^ ^)
+            mood === 'thinking' && "w-2 h-1 rounded-full translate-y-[-1px]", 
+            // Mood: Angry (Slanted > <)
+            mood === 'angry' && (i === 0 ? "rotate-12 h-2 w-1 rounded-sm" : "-rotate-12 h-2 w-1 rounded-sm"),
+            // Blink Override
+            blink && "scale-y-[0.1]"
+          )}
+          style={{
+            transform: mood === 'neutral' 
+              ? `translate(${mousePos.x}px, ${mousePos.y}px) scaleY(${blink ? 0.1 : 1})`
+              : undefined // Disable tracking for expressive moods to keep shape integrity
+          }}
+        />
+      ))}
     </div>
   );
 }
