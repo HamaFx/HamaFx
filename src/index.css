@@ -20,21 +20,44 @@
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* Moving Grid Background */
 body {
   background-color: var(--color-nexus-bg);
+  color: #e2e8f0;
+  position: relative;
+  min-height: 100vh;
+}
+
+/* Moving Grid Overlay */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 200%; /* Wider to allow movement */
+  height: 200%;
   background-image: 
-    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
-  background-size: 50px 50px;
-  background-attachment: fixed;
+    linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px);
+  background-size: 60px 60px;
   animation: gridMove 120s linear infinite;
-  color: #e2e8f0; /* Default text color */
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.6;
+}
+
+/* Vignette to fade edges */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at center, transparent 40%, var(--color-nexus-bg) 100%);
+  pointer-events: none;
+  z-index: -1;
 }
 
 @keyframes gridMove {
-  0% { background-position: 0 0; }
-  100% { background-position: 50px 50px; }
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(-60px, -60px); }
 }
 
 /* Scrollbar */
@@ -271,7 +294,7 @@ body {
   }
 }
 
-/* Missing Keyframes Redefinition for completeness */
+/* Keyframes for animations */
 @keyframes pageEnter {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
