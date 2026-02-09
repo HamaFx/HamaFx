@@ -26,37 +26,32 @@ export function AiCompanion() {
   const state = isLoading ? 'thinking' : hasAlert ? 'alert' : 'idle';
 
   return (
-    <div className="relative w-8 h-8 flex items-center justify-center group cursor-pointer" title="AI System Online">
+    <div className="relative w-6 h-6 flex items-center justify-center" title="AI System Online">
       
-      {/* Outer Ring (Orbit) */}
+      {/* Outer Ring (Orbit) - Brighter & Solid */}
       <div className={cn(
-        "absolute inset-0 rounded-full border border-dashed transition-all duration-500",
-        state === 'idle' && "border-indigo-500/30 w-full h-full animate-[spin_10s_linear_infinite]",
-        state === 'thinking' && "border-purple-500/50 w-full h-full animate-[spin_2s_linear_infinite]",
-        state === 'alert' && "border-red-500/50 w-full h-full animate-none"
+        "absolute inset-0 rounded-full border-2 transition-all duration-500",
+        state === 'idle' && "border-indigo-400/40 border-t-indigo-400 w-full h-full animate-[spin_3s_linear_infinite]",
+        state === 'thinking' && "border-purple-400/60 border-t-purple-400 border-r-purple-400 w-full h-full animate-[spin_1s_linear_infinite]",
+        state === 'alert' && "border-red-500 border-dashed w-full h-full animate-none"
       )} />
 
-      {/* Inner Glow (Aura) */}
+      {/* Inner Glow (Aura) - Stronger */}
       <div className={cn(
-        "absolute w-4 h-4 rounded-full blur-md transition-colors duration-500",
-        state === 'idle' && "bg-indigo-500/60 animate-pulse",
-        state === 'thinking' && "bg-purple-500/80 animate-pulse",
-        state === 'alert' && "bg-red-500/80 animate-pulse"
+        "absolute w-full h-full rounded-full blur-md transition-colors duration-500 opacity-50",
+        state === 'idle' && "bg-indigo-500 animate-pulse",
+        state === 'thinking' && "bg-purple-600 animate-pulse",
+        state === 'alert' && "bg-red-600 animate-pulse"
       )} />
 
-      {/* Core (The Eye) */}
+      {/* Core (The Eye) - Distinct */}
       <div className={cn(
-        "relative w-2 h-2 rounded-full transition-all duration-300 shadow-sm",
-        state === 'idle' && "bg-indigo-300 shadow-[0_0_8px_rgba(99,102,241,0.8)]",
-        state === 'thinking' && "bg-purple-300 shadow-[0_0_12px_rgba(168,85,247,1)] scale-110",
-        state === 'alert' && "bg-red-400 shadow-[0_0_12px_rgba(239,68,68,1)]",
-        blinking && "scale-y-0" // Blink effect
+        "relative w-2.5 h-2.5 rounded-full transition-all duration-300 z-10",
+        state === 'idle' && "bg-indigo-100 shadow-[0_0_10px_rgba(99,102,241,1)]",
+        state === 'thinking' && "bg-purple-100 shadow-[0_0_15px_rgba(168,85,247,1)] scale-110",
+        state === 'alert' && "bg-red-100 shadow-[0_0_15px_rgba(239,68,68,1)]",
+        blinking && "scale-y-0 duration-75"
       )} />
-
-      {/* Tiny Scanline (Horizontal) - Optional Detail */}
-      {state === 'thinking' && (
-        <div className="absolute w-full h-[1px] bg-purple-400/50 animate-[scan_1s_ease-in-out_infinite] top-0" />
-      )}
     </div>
   );
 }
