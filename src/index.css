@@ -20,6 +20,23 @@
   --safe-area-bottom: env(safe-area-inset-bottom, 0px);
 }
 
+/* Moving Grid Background */
+body {
+  background-color: var(--color-nexus-bg);
+  background-image: 
+    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  background-attachment: fixed;
+  animation: gridMove 120s linear infinite;
+  color: #e2e8f0; /* Default text color */
+}
+
+@keyframes gridMove {
+  0% { background-position: 0 0; }
+  100% { background-position: 50px 50px; }
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -66,75 +83,6 @@
 }
 
 /* Page transition */
-@keyframes pageEnter {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* Stagger children */
-@keyframes staggerIn {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* Scale in for modals/cards */
-@keyframes scaleIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-/* Slide in from right */
-@keyframes toastIn {
-    0% { opacity: 0; transform: translateX(100%) scale(0.8); }
-    100% { opacity: 1; transform: translateX(0) scale(1); }
-  }
-
-  @keyframes toastOut {
-    0% { opacity: 1; transform: translateX(0) scale(1); }
-    100% { opacity: 0; transform: translateX(100%) scale(0.8); }
-  }
-
-  @keyframes slideInRight {
-  from { opacity: 0; transform: translateX(16px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-
-/* Glow pulse for live indicators */
-@keyframes glowPulse {
-  0%, 100% { box-shadow: 0 0 4px rgba(16, 185, 129, 0.3); }
-  50% { box-shadow: 0 0 12px rgba(16, 185, 129, 0.6); }
-}
-
-/* Number counter shimmer */
-@keyframes numberShine {
-  0% { background-position: -100% 0; }
-  100% { background-position: 200% 0; }
-}
-
-.animate-shimmer {
-  background: linear-gradient(90deg, #1a1d2e 25%, #252839 50%, #1a1d2e 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-.animate-shimmer-ai {
-  background: linear-gradient(90deg, #1a1d2e 25%, #2d1f5e 50%, #1a1d2e 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s infinite;
-}
-
-.animate-fade-in { animation: fadeIn 0.2s ease-out; }
-.animate-slide-up { animation: slideUp 0.3s ease-out; }
-.price-flash-green { animation: pulse-green 0.5s ease-out; }
-.price-flash-red { animation: pulse-red 0.5s ease-out; }
-
-/* Price flash classes */
-.price-tick-up { animation: tickUp 0.8s ease-out; }
-.price-tick-down { animation: tickDown 0.8s ease-out; }
-.price-bg-up { animation: bgFlashUp 0.8s ease-out; border-radius: 4px; }
-.price-bg-down { animation: bgFlashDown 0.8s ease-out; border-radius: 4px; }
-
-/* Page transition */
 .page-enter { animation: pageEnter 0.3s ease-out; }
 .page-enter-fast { animation: pageEnter 0.15s ease-out; }
 
@@ -145,7 +93,7 @@
 /* Live glow */
 .live-glow { animation: glowPulse 2s ease-in-out infinite; }
 
-/* Stagger children utility — each child delays by --stagger-delay */
+/* Stagger children utility */
 .stagger-children > * {
   opacity: 0;
   animation: staggerIn 0.35s ease-out forwards;
@@ -321,4 +269,26 @@
   button {
     touch-action: manipulation;
   }
+}
+
+/* Missing Keyframes Redefinition for completeness */
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes staggerIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(16, 185, 129, 0.3); }
+  50% { box-shadow: 0 0 12px rgba(16, 185, 129, 0.6); }
 }
