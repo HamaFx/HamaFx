@@ -11,6 +11,7 @@ import { cn } from '@/utils/cn';
 import NotificationCenter from './NotificationCenter';
 import GlobalSearch from './GlobalSearch';
 import AIChatDrawer from '../AIChatDrawer';
+import { AiCompanion } from '@/components/ui/AiCompanion';
 import { useChatStore } from '@/stores/chatStore';
 import { MessageCircle } from 'lucide-react';
 import { PageTransition } from '@/components/ui/PageTransition';
@@ -223,13 +224,16 @@ export function Layout() {
               type="button"
               onClick={toggleChat}
               className={cn(
-                'p-2 rounded-lg transition-colors',
-                chatOpen ? 'bg-purple-500/20 text-purple-400' : 'hover:bg-white/5 text-slate-400 hover:text-slate-200'
+                'flex items-center gap-2 pr-3 pl-1.5 py-1.5 rounded-lg text-sm font-medium transition-colors border group',
+                chatOpen 
+                  ? 'bg-violet-500/10 text-violet-400 border-violet-500/20' 
+                  : 'bg-white/5 text-slate-400 border-transparent hover:text-slate-200 hover:bg-white/10'
               )}
               aria-label={chatOpen ? 'Close AI chat' : 'Open AI chat'}
               data-testid="desktop-ai-chat-toggle"
             >
-              <MessageCircle className="w-4.5 h-4.5" />
+              <AiCompanion />
+              <span className="hidden sm:inline group-hover:text-white transition-colors">AI Copilot</span>
             </button>
 
             <div className={cn('hidden sm:flex items-center rounded-full px-2.5 py-1 text-xs font-semibold', riskPosture.tone)}>
