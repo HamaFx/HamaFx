@@ -11,6 +11,7 @@ import { cn } from '@/utils/cn';
 import NotificationCenter from './NotificationCenter';
 import GlobalSearch from './GlobalSearch';
 import AIChatDrawer from '../AIChatDrawer';
+import { AiCompanion } from '@/components/ui/AiCompanion';
 import { useChatStore } from '@/stores/chatStore';
 import { MessageCircle } from 'lucide-react';
 import { PageTransition } from '@/components/ui/PageTransition';
@@ -47,15 +48,24 @@ function NavItem({ to, icon: Icon, label, collapsed, onClick }: {
       to={to}
       onClick={onClick}
       className={({ isActive }) => cn(
-        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150',
+        'group relative flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 overflow-hidden mx-2',
         isActive
-          ? 'bg-nexus-accent/15 text-indigo-400'
+          ? 'bg-indigo-500/10 text-indigo-400'
           : 'text-slate-400 hover:text-slate-200 hover:bg-white/5',
-        collapsed && 'justify-center px-2'
+        collapsed && 'justify-center px-2 mx-0'
       )}
     >
-      <Icon className="w-5 h-5 shrink-0" />
-      {!collapsed && <span>{label}</span>}
+      {({ isActive }) => (
+        <>
+          {/* Neon Active Line */}
+          {isActive && !collapsed && (
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]" />
+          )}
+          <Icon className={cn("w-5 h-5 shrink-0 transition-colors", isActive ? "text-indigo-400" : "text-slate-500 group-hover:text-slate-300")} />
+          {!collapsed && <span className={isActive ? "translate-x-1 transition-transform" : ""}>{label}</span>}
+          {isActive && !collapsed && <ChevronRight className="w-3.5 h-3.5 ml-auto opacity-50" />}
+        </>
+      )}
     </NavLink>
   );
 }
@@ -91,9 +101,9 @@ export function Layout() {
   return (
     <>
       <a href="#main-content" className="skip-link">Skip to main content</a>
-      <div className="flex h-screen overflow-hidden bg-nexus-bg">
+      <div className="flex h-screen overflow-hidden">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-col w-60 border-r border-nexus-border bg-nexus-card shrink-0">
+      <aside className="hidden md:flex flex-col w-60 border-r border-nexus-border bg-nexus-card/60 backdrop-blur-xl shrink-0 z-20">
         {/* Logo */}
         <div className="flex items-center gap-2.5 px-5 h-16 border-b border-nexus-border">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
@@ -223,13 +233,16 @@ export function Layout() {
               type="button"
               onClick={toggleChat}
               className={cn(
-                'p-2 rounded-lg transition-colors',
-                chatOpen ? 'bg-purple-500/20 text-purple-400' : 'hover:bg-white/5 text-slate-400 hover:text-slate-200'
+                'flex items-center gap-2 pr-3 pl-1.5 py-1.5 rounded-lg text-sm font-medium transition-colors border group',
+                chatOpen 
+                  ? 'bg-violet-500/10 text-violet-400 border-violet-500/20' 
+                  : 'bg-white/5 text-slate-400 border-transparent hover:text-slate-200 hover:bg-white/10'
               )}
               aria-label={chatOpen ? 'Close AI chat' : 'Open AI chat'}
               data-testid="desktop-ai-chat-toggle"
             >
-              <MessageCircle className="w-4.5 h-4.5" />
+              <AiCompanion />
+              <span className="hidden sm:inline group-hover:text-white transition-colors">AI Copilot</span>
             </button>
 
             <div className={cn('hidden sm:flex items-center rounded-full px-2.5 py-1 text-xs font-semibold', riskPosture.tone)}>

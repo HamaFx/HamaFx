@@ -111,6 +111,12 @@ export function App() {
 
   return (
     <HashRouter>
+      {/* Background Layers */}
+      <div className="app-bg-base" />
+      <div className="app-bg-grid" />
+      <div className="app-bg-orbs" />
+      <div className="app-bg-vignette" />
+      
       <Suspense fallback={<RouteFallback />}>
         <AppRoutes />
       </Suspense>
