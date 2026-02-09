@@ -129,6 +129,29 @@ body {
   100% { background-color: transparent; }
 }
 
+/* Utility animation classes used across pages/components */
+.animate-shimmer {
+  background: linear-gradient(90deg, #1a1d2e 25%, #252839 50%, #1a1d2e 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.animate-shimmer-ai {
+  background: linear-gradient(90deg, #1a1d2e 25%, #2d1f5e 50%, #1a1d2e 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.animate-fade-in { animation: fadeIn 0.2s ease-out; }
+.animate-slide-up { animation: slideUp 0.3s ease-out; }
+.price-flash-green { animation: pulse-green 0.5s ease-out; }
+.price-flash-red { animation: pulse-red 0.5s ease-out; }
+
+.price-tick-up { animation: tickUp 0.8s ease-out; }
+.price-tick-down { animation: tickDown 0.8s ease-out; }
+.price-bg-up { animation: bgFlashUp 0.8s ease-out; border-radius: 4px; }
+.price-bg-down { animation: bgFlashDown 0.8s ease-out; border-radius: 4px; }
+
 /* Page transition */
 .page-enter { animation: pageEnter 0.3s ease-out; }
 .page-enter-fast { animation: pageEnter 0.15s ease-out; }
@@ -352,4 +375,7 @@ body {
   40% { transform: rotate(10deg); }
   60% { transform: rotate(-10deg); }
   80% { transform: rotate(10deg); }
+}
+.animate-shake {
+  animation: shake 0.5s ease-in-out;
 }

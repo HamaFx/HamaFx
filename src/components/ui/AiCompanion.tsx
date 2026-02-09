@@ -43,6 +43,10 @@ export function AiCompanion() {
   
   const containerRef = useRef<HTMLDivElement>(null);
   const sleepTimeout = useRef<number>(0);
+  const tradeMessageTimeout = useRef<number | null>(null);
+  const alertMessageTimeout = useRef<number | null>(null);
+  const tipMessageTimeout = useRef<number | null>(null);
+  const pokeTimeout = useRef<number | null>(null);
   const prevTradesLen = useRef(tradeHistory.length);
   const prevAlertsLen = useRef(triggeredAlerts.length);
 
@@ -51,7 +55,13 @@ export function AiCompanion() {
     if (tradeHistory.length > prevTradesLen.current) {
       setLoveMode(true);
       setMessage("Order Placed! 🚀");
-      setTimeout(() => { setLoveMode(false); setMessage(null); }, 3000);
+      if (tradeMessageTimeout.current) {
+        window.clearTimeout(tradeMessageTimeout.current);
+      }
+      tradeMessageTimeout.current = window.setTimeout(() => {
+        setLoveMode(false);
+        setMessage(null);
+      }, 3000);
     }
     prevTradesLen.current = tradeHistory.length;
   }, [tradeHistory.length]);
@@ -63,7 +73,10 @@ export function AiCompanion() {
       // Format: BTC ↑ 95000
       const arrow = last.type.includes('above') ? '↑' : last.type.includes('below') ? '↓' : '∆';
       setMessage(`${last.symbol} ${arrow} ${last.targetValue}`);
-      setTimeout(() => setMessage(null), 5000);
+      if (alertMessageTimeout.current) {
+        window.clearTimeout(alertMessageTimeout.current);
+      }
+      alertMessageTimeout.current = window.setTimeout(() => setMessage(null), 5000);
     }
     prevAlertsLen.current = triggeredAlerts.length;
   }, [triggeredAlerts]);
@@ -74,10 +87,18 @@ export function AiCompanion() {
       if (Math.random() > 0.9 && !message && userActive && !isLoading) { // 10% chance every 30s
         const tip = TIPS[Math.floor(Math.random() * TIPS.length)];
         setMessage(tip);
-        setTimeout(() => setMessage(null), 4000);
+        if (tipMessageTimeout.current) {
+          window.clearTimeout(tipMessageTimeout.current);
+        }
+        tipMessageTimeout.current = window.setTimeout(() => setMessage(null), 4000);
       }
     }, 30000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      if (tipMessageTimeout.current) {
+        window.clearTimeout(tipMessageTimeout.current);
+      }
+    };
   }, [message, userActive, isLoading]);
 
   // Derived Mood Priority
@@ -124,23 +145,50 @@ export function AiCompanion() {
 
   // Auto Blink
   useEffect(() => {
-    const blinkLoop = () => {
-      if (['neutral', 'happy', 'sad', 'talking'].includes(mood)) {
-        setBlink(true);
-        setTimeout(() => setBlink(false), 150);
-      }
-      setTimeout(blinkLoop, Math.random() * 3000 + 2000);
+    let cancelled = false;
+    let loopTimer: number | null = null;
+    let blinkTimer: number | null = null;
+
+    const scheduleBlink = () => {
+      const delay = Math.random() * 3000 + 2000;
+      loopTimer = window.setTimeout(() => {
+        if (cancelled) return;
+        if (['neutral', 'happy', 'sad', 'talking'].includes(mood)) {
+          setBlink(true);
+          blinkTimer = window.setTimeout(() => {
+            if (!cancelled) setBlink(false);
+          }, 150);
+        }
+        scheduleBlink();
+      }, delay);
     };
-    const timer = setTimeout(blinkLoop, 2000);
-    return () => clearTimeout(timer);
+
+    scheduleBlink();
+    return () => {
+      cancelled = true;
+      if (loopTimer) window.clearTimeout(loopTimer);
+      if (blinkTimer) window.clearTimeout(blinkTimer);
+    };
   }, [mood]);
 
   const handlePoke = (e: React.MouseEvent) => {
     e.stopPropagation();
     setPoked(true);
     setMessage("Ouch! 😵‍💫");
-    setTimeout(() => { setPoked(false); setMessage(null); }, 2000);
+    if (pokeTimeout.current) {
+      window.clearTimeout(pokeTimeout.current);
+    }
+    pokeTimeout.current = window.setTimeout(() => { setPoked(false); setMessage(null); }, 2000);
   };
+
+  useEffect(() => {
+    return () => {
+      if (tradeMessageTimeout.current) window.clearTimeout(tradeMessageTimeout.current);
+      if (alertMessageTimeout.current) window.clearTimeout(alertMessageTimeout.current);
+      if (tipMessageTimeout.current) window.clearTimeout(tipMessageTimeout.current);
+      if (pokeTimeout.current) window.clearTimeout(pokeTimeout.current);
+    };
+  }, []);
 
   return (
     <div className="relative flex items-center">
