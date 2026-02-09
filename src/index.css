@@ -339,6 +339,13 @@ body {
   0%, 100% { box-shadow: 0 0 4px rgba(16, 185, 129, 0.3); }
   50% { box-shadow: 0 0 12px rgba(16, 185, 129, 0.6); }
 }
+@keyframes ticker {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-ticker {
+  animation: ticker 30s linear infinite;
+}
 @keyframes shake {
   0%, 100% { transform: rotate(0deg); }
   20% { transform: rotate(-10deg); }

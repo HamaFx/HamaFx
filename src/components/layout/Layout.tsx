@@ -12,6 +12,7 @@ import NotificationCenter from './NotificationCenter';
 import GlobalSearch from './GlobalSearch';
 import AIChatDrawer from '../AIChatDrawer';
 import { AiCompanion } from '@/components/ui/AiCompanion';
+import { MiniTicker } from '@/components/ui/MiniTicker';
 import { useChatStore } from '@/stores/chatStore';
 import { MessageCircle } from 'lucide-react';
 import { PageTransition } from '@/components/ui/PageTransition';
