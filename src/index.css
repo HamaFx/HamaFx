@@ -25,39 +25,47 @@ body {
   color: #e2e8f0;
   position: relative;
   min-height: 100vh;
+  overflow-x: hidden; /* Prevent horizontal scroll from glows */
 }
 
-/* Moving Grid Overlay */
+/* 1. Moving Neon Grid (Indigo) */
 body::before {
   content: "";
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 200%; /* Wider to allow movement */
+  top: -50%;
+  left: -50%;
+  width: 200%;
   height: 200%;
   background-image: 
-    linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px);
+    linear-gradient(rgba(99, 102, 241, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 102, 241, 0.1) 1px, transparent 1px);
   background-size: 60px 60px;
   animation: gridMove 120s linear infinite;
   pointer-events: none;
-  z-index: -1;
-  opacity: 0.6;
+  z-index: -2;
 }
 
-/* Vignette to fade edges */
+/* 2. Ambient Color Orbs (Top-Left Violet, Bottom-Right Blue) */
 body::after {
   content: "";
   position: fixed;
   inset: 0;
-  background: radial-gradient(circle at center, transparent 40%, var(--color-nexus-bg) 100%);
+  background: 
+    radial-gradient(circle at 15% 20%, rgba(139, 92, 246, 0.15) 0%, transparent 40%),
+    radial-gradient(circle at 85% 80%, rgba(59, 130, 246, 0.15) 0%, transparent 40%);
   pointer-events: none;
   z-index: -1;
+  animation: orbPulse 10s ease-in-out infinite alternate;
 }
 
 @keyframes gridMove {
-  0% { transform: translate(0, 0); }
-  100% { transform: translate(-60px, -60px); }
+  0% { transform: translate(0, 0) rotate(0deg); }
+  100% { transform: translate(-60px, -60px) rotate(0deg); }
+}
+
+@keyframes orbPulse {
+  0% { opacity: 0.8; transform: scale(1); }
+  100% { opacity: 1; transform: scale(1.05); }
 }
 
 /* Scrollbar */
