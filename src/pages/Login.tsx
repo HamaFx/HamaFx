@@ -76,9 +76,9 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] bg-nexus-bg">
-      {/* Background gradient */}
-      <div className="fixed inset-0 bg-gradient-to-br from-indigo-950/30 via-nexus-bg to-violet-950/20 pointer-events-none" />
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+      {/* Background gradient - Simplified to let grid show */}
+      <div className="fixed inset-0 bg-gradient-to-br from-indigo-950/20 to-violet-950/10 pointer-events-none" />
 
       <div className="relative w-full max-w-md space-y-8">
         {/* Logo */}
