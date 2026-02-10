@@ -213,6 +213,17 @@ export default function AIChatDrawer() {
   useEffect(() => {
     if (!isOpen) return;
 
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') toggleChat();
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isOpen, toggleChat]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
     let active = true;
     setIntelLoading(true);
     setIntelError(null);
@@ -301,7 +312,7 @@ export default function AIChatDrawer() {
         role="dialog"
         aria-modal="true"
         aria-label="HamaFX AI chat"
-        className="fixed right-0 top-0 bottom-0 w-full max-w-lg bg-gray-900 border-l border-gray-700 z-50 flex flex-col animate-[slideInRight_0.3s_ease] modal-scroll-contain"
+        className="fixed right-0 top-0 bottom-0 w-full max-w-lg bg-gray-900 border-l border-gray-700 z-[60] flex flex-col animate-[slideInRight_0.3s_ease] modal-scroll-contain"
       >
         <div className="border-b border-gray-700 bg-gray-900/95">
           <div className="flex items-center justify-between p-4">
@@ -380,7 +391,7 @@ export default function AIChatDrawer() {
                       {commandCenter.posture} posture
                     </span>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 font-medium">
-                      Confidence {commandCenter.confidence.toFixed(0)}%
+                      Confidence {Number.isFinite(commandCenter.confidence) ? `${commandCenter.confidence.toFixed(0)}%` : 'N/A'}
                     </span>
                   </div>
                 )}
@@ -580,7 +591,12 @@ export default function AIChatDrawer() {
               aria-label="Chat message input"
               value={input}
               onChange={e => setInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage(input)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  void sendMessage(input);
+                }
+              }}
               placeholder={modePlaceholder(mode)}
               className="flex-1 bg-gray-800 border border-gray-700 focus:border-indigo-500 rounded-xl px-4 py-2.5 text-sm text-white placeholder-gray-500 outline-none transition-colors"
               disabled={isLoading}

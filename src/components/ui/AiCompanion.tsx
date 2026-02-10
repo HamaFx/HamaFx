@@ -23,7 +23,7 @@ export function AiCompanion({ compact = false }: { compact?: boolean }) {
 
   const triggeredAlerts = alerts.filter(a => a.isTriggered);
   const hasAlert = triggeredAlerts.length > 0;
-  
+
   // PnL Logic
   const { percent: pnlPercent } = getTotalPnL();
   const isProfitable = pnlPercent >= 0.5;
@@ -40,7 +40,7 @@ export function AiCompanion({ compact = false }: { compact?: boolean }) {
   const [userActive, setUserActive] = useState(true);
   const [poked, setPoked] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  
+
   const containerRef = useRef<HTMLDivElement>(null);
   const sleepTimeout = useRef<number>(0);
   const tradeMessageTimeout = useRef<number | null>(null);
@@ -87,7 +87,7 @@ export function AiCompanion({ compact = false }: { compact?: boolean }) {
   useEffect(() => {
     if (compact) return;
     const interval = setInterval(() => {
-      if (Math.random() > 0.9 && !message && userActive && !isLoading) { // 10% chance every 30s
+      if (Math.random() > 0.9 && !message && userActive && !isLoading) {
         const tip = TIPS[Math.floor(Math.random() * TIPS.length)];
         setMessage(tip);
         if (tipMessageTimeout.current) {
@@ -117,6 +117,8 @@ export function AiCompanion({ compact = false }: { compact?: boolean }) {
 
   // Mouse/Activity Tracking
   useEffect(() => {
+    if (compact) return;
+
     const resetSleepTimer = () => {
       setUserActive(true);
       window.clearTimeout(sleepTimeout.current);
@@ -137,14 +139,14 @@ export function AiCompanion({ compact = false }: { compact?: boolean }) {
 
     window.addEventListener('mousemove', handleActivity);
     window.addEventListener('click', resetSleepTimer);
-    resetSleepTimer(); 
+    resetSleepTimer();
 
     return () => {
       window.removeEventListener('mousemove', handleActivity);
       window.removeEventListener('click', resetSleepTimer);
       window.clearTimeout(sleepTimeout.current);
     };
-  }, [mood]);
+  }, [compact, mood]);
 
   // Auto Blink
   useEffect(() => {
@@ -182,7 +184,10 @@ export function AiCompanion({ compact = false }: { compact?: boolean }) {
     if (pokeTimeout.current) {
       window.clearTimeout(pokeTimeout.current);
     }
-    pokeTimeout.current = window.setTimeout(() => { setPoked(false); setMessage(null); }, 2000);
+    pokeTimeout.current = window.setTimeout(() => {
+      setPoked(false);
+      setMessage(null);
+    }, 2000);
   };
 
   useEffect(() => {
@@ -196,7 +201,6 @@ export function AiCompanion({ compact = false }: { compact?: boolean }) {
 
   return (
     <div className="relative flex items-center">
-      
       {/* Speech Bubble */}
       {!compact && message && (
         <div className="absolute right-full mr-3 px-2.5 py-1.5 bg-nexus-elevated border border-nexus-border rounded-lg text-xs font-medium whitespace-nowrap animate-in slide-in-from-right-2 fade-in duration-200 shadow-lg text-white">
@@ -207,30 +211,30 @@ export function AiCompanion({ compact = false }: { compact?: boolean }) {
       )}
 
       {/* Face */}
-      <div 
+      <div
         ref={containerRef}
         onClick={handlePoke}
         className={cn(
-          "relative w-12 h-7 rounded-full flex items-center justify-center gap-1.5 transition-all duration-500 border shadow-lg overflow-hidden",
-          compact ? "cursor-default" : "cursor-pointer",
+          'relative rounded-full flex items-center justify-center gap-1.5 transition-all duration-500 border shadow-lg overflow-hidden',
+          compact ? 'w-9 h-6 cursor-default' : 'w-12 h-7 cursor-pointer',
           // Neutral
-          mood === 'neutral' && "bg-[#09090b] border-[#27272a] shadow-indigo-500/10",
+          mood === 'neutral' && 'bg-[#09090b] border-[#27272a] shadow-indigo-500/10',
           // Sleep
-          mood === 'sleep' && "bg-[#050505] border-[#1a1a1a] opacity-70 scale-95",
+          mood === 'sleep' && 'bg-[#050505] border-[#1a1a1a] opacity-70 scale-95',
           // Talking
-          mood === 'talking' && "bg-indigo-950 border-indigo-500/50 w-14 shadow-indigo-500/30",
+          mood === 'talking' && cn('bg-indigo-950 border-indigo-500/50 shadow-indigo-500/30', !compact && 'w-14'),
           // Angry
-          mood === 'angry' && "bg-red-950 border-red-500/50 shadow-red-500/20",
+          mood === 'angry' && 'bg-red-950 border-red-500/50 shadow-red-500/20',
           // Dizzy
-          mood === 'dizzy' && "bg-purple-950 border-purple-500/50 animate-shake",
+          mood === 'dizzy' && cn('bg-purple-950 border-purple-500/50', !compact && 'animate-shake'),
           // Happy
-          mood === 'happy' && "bg-emerald-950 border-emerald-500/50 shadow-emerald-500/20",
+          mood === 'happy' && 'bg-emerald-950 border-emerald-500/50 shadow-emerald-500/20',
           // Sad
-          mood === 'sad' && "bg-rose-950 border-rose-500/50 shadow-rose-500/10",
+          mood === 'sad' && 'bg-rose-950 border-rose-500/50 shadow-rose-500/10',
           // Love
-          mood === 'love' && "bg-pink-950 border-pink-500/50 shadow-pink-500/30 animate-[bounce_0.5s_infinite]",
+          mood === 'love' && cn('bg-pink-950 border-pink-500/50 shadow-pink-500/30', !compact && 'animate-[bounce_0.5s_infinite]'),
           // Scared
-          mood === 'scared' && "bg-amber-950 border-amber-500/50 animate-shake shadow-amber-500/20"
+          mood === 'scared' && cn('bg-amber-950 border-amber-500/50 shadow-amber-500/20', !compact && 'animate-shake')
         )}
       >
         {/* Eyes */}
@@ -238,20 +242,20 @@ export function AiCompanion({ compact = false }: { compact?: boolean }) {
           <div
             key={i}
             className={cn(
-              "bg-white transition-all duration-300 ease-out will-change-transform",
-              "w-1.5 h-1.5 rounded-full",
-              mood === 'sleep' && "h-[1px] w-2 opacity-50",
-              mood === 'talking' && ["w-1.5 h-3 rounded-full animate-[bounce_0.4s_infinite]", i === 1 && "animation-delay-100"],
-              mood === 'angry' && (i === 0 ? "rotate-12 h-2 w-1 rounded-sm bg-red-200" : "-rotate-12 h-2 w-1 rounded-sm bg-red-200"),
-              mood === 'dizzy' && "w-2 h-2 bg-pink-300 rounded-none animate-spin",
-              mood === 'happy' && "h-1 w-2 rounded-t-full bg-emerald-200 translate-y-[-1px]",
-              mood === 'sad' && (i === 0 ? "-rotate-12 h-[2px] w-2 bg-rose-200" : "rotate-12 h-[2px] w-2 bg-rose-200"),
-              mood === 'love' && "w-2 h-2 bg-pink-300 rounded-full scale-125",
-              mood === 'scared' && "h-3 w-1.5 rounded-full bg-amber-200",
-              blink && mood !== 'sleep' && "scale-y-[0.1]"
+              'bg-white transition-all duration-300 ease-out will-change-transform',
+              'w-1.5 h-1.5 rounded-full',
+              mood === 'sleep' && 'h-[1px] w-2 opacity-50',
+              mood === 'talking' && ['w-1.5 h-3 rounded-full animate-[bounce_0.4s_infinite]', i === 1 && 'animation-delay-100'],
+              mood === 'angry' && (i === 0 ? 'rotate-12 h-2 w-1 rounded-sm bg-red-200' : '-rotate-12 h-2 w-1 rounded-sm bg-red-200'),
+              mood === 'dizzy' && 'w-2 h-2 bg-pink-300 rounded-none animate-spin',
+              mood === 'happy' && 'h-1 w-2 rounded-t-full bg-emerald-200 translate-y-[-1px]',
+              mood === 'sad' && (i === 0 ? '-rotate-12 h-[2px] w-2 bg-rose-200' : 'rotate-12 h-[2px] w-2 bg-rose-200'),
+              mood === 'love' && 'w-2 h-2 bg-pink-300 rounded-full scale-125',
+              mood === 'scared' && 'h-3 w-1.5 rounded-full bg-amber-200',
+              blink && mood !== 'sleep' && 'scale-y-[0.1]'
             )}
             style={{
-              transform: (['neutral', 'happy', 'sad'].includes(mood))
+              transform: ['neutral', 'happy', 'sad'].includes(mood)
                 ? `translate(${mousePos.x}px, ${mousePos.y}px) scaleY(${blink ? 0.1 : 1})`
                 : undefined
             }}

@@ -61,6 +61,7 @@ interface GlobalSearchProps {
   onAskAi?: () => void;
   onCreateAlert?: () => void;
   onCreateOrder?: () => void;
+  enableHotkeys?: boolean;
 }
 
 function formatPrice(price: number, type: 'crypto' | 'forex', precision?: number) {
@@ -84,6 +85,7 @@ export default function GlobalSearch({
   onAskAi,
   onCreateAlert,
   onCreateOrder,
+  enableHotkeys = true,
 }: GlobalSearchProps) {
   const navigate = useNavigate();
   const { cryptoAssets, forexPairs } = useMarketStore();
@@ -107,6 +109,8 @@ export default function GlobalSearch({
   };
 
   useEffect(() => {
+    if (!enableHotkeys) return;
+
     const handler = (e: KeyboardEvent) => {
       const isInputTarget = e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement;
       const isCommand = (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k';
@@ -138,7 +142,7 @@ export default function GlobalSearch({
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [open]);
+  }, [enableHotkeys, open]);
 
   useEffect(() => {
     if (!open) return;

@@ -37,6 +37,24 @@ function Shimmer({ className }: { className?: string }) {
   return <div className={cn('animate-shimmer rounded-lg', className)} />;
 }
 
+const ONBOARDING_DISMISSED_KEY = 'hamafx_onboarding_dismissed';
+
+function readOnboardingDismissed(): boolean {
+  try {
+    return localStorage.getItem(ONBOARDING_DISMISSED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function writeOnboardingDismissed(): void {
+  try {
+    localStorage.setItem(ONBOARDING_DISMISSED_KEY, '1');
+  } catch {
+    // Ignore storage errors in restricted browsing modes.
+  }
+}
+
 function MiniSparkline({ data, positive }: { data?: number[]; positive: boolean }) {
   if (!data || data.length < 5) return null;
   const points = data.slice(-20);
@@ -89,7 +107,7 @@ export default function Dashboard() {
   const { alerts } = useAlertStore();
   const { user } = useAuthStore();
   const backendAiReady = isBackendEnabled();
-  const [onboardingDismissed, setOnboardingDismissed] = useState(() => localStorage.getItem('hamafx_onboarding_dismissed') === '1');
+  const [onboardingDismissed, setOnboardingDismissed] = useState(() => readOnboardingDismissed());
   const [aiInsights, setAiInsights] = useState<AiDashboardInsights | null>(null);
   const [aiInsightsLoading, setAiInsightsLoading] = useState(false);
   const [aiCommandCenter, setAiCommandCenter] = useState<AiCommandCenter | null>(null);
@@ -273,7 +291,7 @@ export default function Dashboard() {
             <button
               type="button"
               onClick={() => {
-                localStorage.setItem('hamafx_onboarding_dismissed', '1');
+                writeOnboardingDismissed();
                 setOnboardingDismissed(true);
               }}
               className="p-1.5 rounded-lg text-slate-500 hover:text-slate-300 hover:bg-white/5 transition-colors"
@@ -473,7 +491,7 @@ export default function Dashboard() {
                       {aiCommandCenter.posture} posture
                     </span>
                     <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 font-medium">
-                      Confidence {aiCommandCenter.confidence.toFixed(0)}%
+                      Confidence {Number.isFinite(aiCommandCenter.confidence) ? aiCommandCenter.confidence.toFixed(0) + '%' : 'N/A'}
                     </span>
                   </div>
                   {aiCommandCenter.topActions.length > 0 && (

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ComponentType } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentType } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -28,6 +28,8 @@ import { useAuthStore } from '@/stores/authStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useChatStore } from '@/stores/chatStore';
 import { useMarketStore } from '@/stores/marketStore';
+import { useWatchlistStore } from '@/stores/watchlistStore';
+import { useAlertStore } from '@/stores/alertStore';
 import { cn } from '@/utils/cn';
 import { readMarketsUrlState, readPortfolioUrlState, readSettingsUrlState } from '@/utils/urlState';
 import { getForexSessionSnapshot } from '@/services/forexSessions';
@@ -56,10 +58,19 @@ type SecondaryLink = {
   active: boolean;
 };
 
+type NavBadge = {
+  text: string;
+  toneClass: string;
+  title: string;
+};
+
 const SIDEBAR_COLLAPSE_KEY = 'hamafx_sidebar_collapsed_v1';
 const SIDEBAR_FAVORITES_KEY = 'hamafx_sidebar_favorites_v1';
 const SIDEBAR_RECENTS_KEY = 'hamafx_sidebar_recents_v1';
 const DEFAULT_FAVORITES = ['/', '/markets', '/portfolio'];
+const SIDEBAR_COLLAPSED_CLASS = 'w-[4.75rem]';
+const SIDEBAR_EXPANDED_CLASS = 'w-64';
+const HEADER_HEIGHT_CLASS = 'h-14 md:h-16';
 
 const navItems: NavItemDef[] = [
   { to: '/', icon: LayoutDashboard, label: 'Dashboard', mobileLabel: 'Home', group: 'trade', description: 'Overview and command center' },
@@ -166,6 +177,7 @@ function NavItem({
   showPin,
   isFavorite,
   onToggleFavorite,
+  badge,
 }: {
   item: NavItemDef;
   collapsed?: boolean;
@@ -173,6 +185,7 @@ function NavItem({
   showPin?: boolean;
   isFavorite?: boolean;
   onToggleFavorite?: (route: string) => void;
+  badge?: NavBadge;
 }) {
   const Icon = item.icon;
 
@@ -182,34 +195,58 @@ function NavItem({
         to={item.to}
         title={collapsed ? item.label : undefined}
         onClick={onClick}
+        data-sidebar-nav-link="true"
         className={({ isActive }) =>
           cn(
-            'group/nav relative flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-200 overflow-hidden',
+            'group/nav relative flex items-center gap-3 rounded-lg text-sm font-medium transition-all duration-200 overflow-hidden touch-target',
             collapsed ? 'justify-center px-2 py-2.5 w-full' : 'px-3 py-2.5 w-full',
-            showPin && !collapsed && 'pr-9',
+            !collapsed && showPin && 'pr-10',
             isActive
-              ? 'bg-indigo-500/10 text-indigo-400 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.2)]'
+              ? 'bg-gradient-to-r from-indigo-500/20 to-violet-500/10 text-indigo-100 shadow-[inset_0_0_0_1px_rgba(99,102,241,0.35),0_0_18px_rgba(99,102,241,0.18)]'
               : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
           )
         }
       >
         {({ isActive }) => (
           <>
-            {isActive && !collapsed && (
-              <div className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-r-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.8)]" />
+            {isActive && (
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1.5 rounded-r-full bg-gradient-to-b from-indigo-400 to-violet-500 shadow-[0_0_12px_rgba(99,102,241,0.9)]" />
             )}
             <Icon
               className={cn(
-                'w-5 h-5 shrink-0 transition-colors',
-                isActive ? 'text-indigo-400' : 'text-slate-500 group-hover/nav:text-slate-300'
+                'w-[18px] h-[18px] shrink-0 transition-colors',
+                isActive ? 'text-indigo-300' : 'text-slate-500 group-hover/nav:text-slate-300'
               )}
             />
             {!collapsed && (
-              <>
-                <span className={cn('truncate', isActive && 'translate-x-1 transition-transform')}>
+              <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+                <span className={cn('truncate', isActive && 'translate-x-0.5 transition-transform')}>
                   {item.label}
                 </span>
-              </>
+                {badge && (
+                  <span
+                    title={badge.title}
+                    className={cn('rounded-full border px-1.5 py-0.5 text-[10px] font-semibold leading-none', badge.toneClass)}
+                  >
+                    {badge.text}
+                  </span>
+                )}
+              </div>
+            )}
+            {collapsed && badge && (
+              <span
+                title={badge.title}
+                className={cn(
+                  'absolute top-2 right-2 h-1.5 w-1.5 rounded-full',
+                  badge.toneClass.includes('red')
+                    ? 'bg-red-400'
+                    : badge.toneClass.includes('amber')
+                    ? 'bg-amber-400'
+                    : badge.toneClass.includes('emerald')
+                    ? 'bg-emerald-400'
+                    : 'bg-indigo-400'
+                )}
+              />
             )}
           </>
         )}
@@ -243,22 +280,33 @@ export function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    return window.localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1';
+    try {
+      return window.localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === '1';
+    } catch {
+      return false;
+    }
   });
   const [favoriteRoutes, setFavoriteRoutes] = useState<string[]>(() => readStoredRoutes(SIDEBAR_FAVORITES_KEY, DEFAULT_FAVORITES));
   const [recentRoutes, setRecentRoutes] = useState<string[]>(() => readStoredRoutes(SIDEBAR_RECENTS_KEY, []));
   const [sessionSnapshot, setSessionSnapshot] = useState(() => getForexSessionSnapshot());
+  const sidebarNavRef = useRef<HTMLElement | null>(null);
 
   const { user, logout } = useAuthStore();
   const { settings, setTheme, hasGeminiKey } = useSettingsStore();
-  const { forexPairs } = useMarketStore();
+  const { forexPairs, isLoadingCrypto, isLoadingForex, error: marketError } = useMarketStore();
+  const { watchlists } = useWatchlistStore();
+  const { alerts } = useAlertStore();
   const { isOpen: chatOpen, isLoading: aiLoading, messages, openChat } = useChatStore();
 
   const navigate = useNavigate();
   const location = useLocation();
 
   const aiConnected = hasGeminiKey() || isBackendEnabled();
-  const isDark = settings.theme === 'dark' || (settings.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const isDark =
+    settings.theme === 'dark' ||
+    (settings.theme === 'system' && typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      ? window.matchMedia('(prefers-color-scheme: dark)').matches
+      : false);
 
   const riskPosture = (() => {
     if (!settings.trading.enableRiskGuardrails) {
@@ -294,6 +342,16 @@ export function Layout() {
     : aiConnected
       ? formatRelativeTime(lastAssistantTimestamp)
       : 'AI not configured';
+
+  const aiStatusLabel = aiLoading ? 'AI syncing' : aiConnected ? 'AI ready' : 'AI setup required';
+
+  const aiStatusTone = aiLoading
+    ? 'border-violet-400/35 bg-violet-500/12 text-violet-200'
+    : aiConnected
+      ? 'border-emerald-400/35 bg-emerald-500/12 text-emerald-200'
+      : 'border-amber-400/35 bg-amber-500/12 text-amber-200';
+
+  const isHeaderBusy = aiLoading || isLoadingCrypto || isLoadingForex;
 
   const forexSession = forexPairs[0]?.sessionLabel ?? sessionSnapshot.label;
   const forexSessionState = forexPairs[0]?.marketStatus ?? sessionSnapshot.state;
@@ -412,6 +470,105 @@ export function Layout() {
     []
   );
 
+  const watchlistSymbolCount = useMemo(
+    () => watchlists.reduce((sum, list) => sum + list.symbols.length, 0),
+    [watchlists]
+  );
+
+  const triggeredAlertCount = useMemo(
+    () => alerts.filter((alert) => alert.isTriggered).length,
+    [alerts]
+  );
+
+  const activeAlertCount = useMemo(
+    () => alerts.filter((alert) => alert.isActive && !alert.isTriggered).length,
+    [alerts]
+  );
+
+  const navBadges = useMemo<Record<string, NavBadge | undefined>>(
+    () => ({
+      '/watchlist':
+        watchlistSymbolCount > 0
+          ? {
+              text: String(watchlistSymbolCount),
+              toneClass: 'border-indigo-400/35 bg-indigo-500/15 text-indigo-200',
+              title: String(watchlistSymbolCount) + ' symbols in watchlists',
+            }
+          : undefined,
+      '/alerts':
+        triggeredAlertCount > 0
+          ? {
+              text: String(triggeredAlertCount),
+              toneClass: 'border-red-400/40 bg-red-500/15 text-red-200',
+              title: String(triggeredAlertCount) + ' triggered alerts',
+            }
+          : activeAlertCount > 0
+          ? {
+              text: String(activeAlertCount),
+              toneClass: 'border-amber-400/35 bg-amber-500/15 text-amber-200',
+              title: String(activeAlertCount) + ' active alerts',
+            }
+          : undefined,
+      '/settings': !aiConnected
+        ? {
+            text: 'Setup',
+            toneClass: 'border-amber-400/35 bg-amber-500/15 text-amber-200',
+            title: 'Configure AI to unlock copilot features',
+          }
+        : undefined,
+      '/markets': marketError
+        ? {
+            text: 'Cache',
+            toneClass: 'border-amber-400/35 bg-amber-500/15 text-amber-200',
+            title: marketError,
+          }
+        : undefined,
+    }),
+    [activeAlertCount, aiConnected, marketError, triggeredAlertCount, watchlistSymbolCount]
+  );
+
+  const badgeForRoute = (route: string) => navBadges[route];
+
+  const handleSidebarNavigationKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (!(event.target instanceof HTMLElement)) return;
+    if (!event.target.matches('[data-sidebar-nav-link="true"]')) return;
+
+    const links = Array.from(
+      sidebarNavRef.current?.querySelectorAll<HTMLElement>('[data-sidebar-nav-link="true"]') ?? []
+    );
+
+    if (links.length === 0) return;
+    const index = links.indexOf(event.target);
+    if (index === -1) return;
+
+    const focusAt = (nextIndex: number) => {
+      links[nextIndex]?.focus();
+    };
+
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      focusAt((index + 1) % links.length);
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      focusAt((index - 1 + links.length) % links.length);
+      return;
+    }
+
+    if (event.key === 'Home') {
+      event.preventDefault();
+      focusAt(0);
+      return;
+    }
+
+    if (event.key === 'End') {
+      event.preventDefault();
+      focusAt(links.length - 1);
+    }
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login');
@@ -431,19 +588,35 @@ export function Layout() {
   };
 
   useEffect(() => {
-    window.localStorage.setItem(SIDEBAR_COLLAPSE_KEY, sidebarCollapsed ? '1' : '0');
+    try {
+      window.localStorage.setItem(SIDEBAR_COLLAPSE_KEY, sidebarCollapsed ? '1' : '0');
+    } catch {
+      // Ignore storage errors in restricted browsing modes.
+    }
   }, [sidebarCollapsed]);
 
   useEffect(() => {
     if (!sidebarOpen) return;
+
     const handleResize = () => {
       if (window.innerWidth >= 768 && sidebarOpen) {
         setSidebarOpen(false);
       }
     };
 
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setSidebarOpen(false);
+      }
+    };
+
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('keydown', handleEscape);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('keydown', handleEscape);
+    };
   }, [sidebarOpen]);
 
   useEffect(() => {
@@ -471,7 +644,7 @@ export function Layout() {
         <aside
           className={cn(
             'hidden md:flex flex-col border-r border-nexus-border bg-nexus-card/60 backdrop-blur-xl shrink-0 z-20 transition-[width] duration-300',
-            sidebarCollapsed ? 'w-[4.75rem]' : 'w-64'
+            sidebarCollapsed ? SIDEBAR_COLLAPSED_CLASS : SIDEBAR_EXPANDED_CLASS
           )}
         >
           <div className="flex items-center gap-2.5 px-4 h-16 border-b border-nexus-border">
@@ -508,7 +681,8 @@ export function Layout() {
                         showPin
                         isFavorite
                         onToggleFavorite={toggleFavorite}
-                      />
+                      badge={badgeForRoute(item.to)}
+                    />
                     ))}
                   </div>
                 </section>
@@ -525,7 +699,8 @@ export function Layout() {
                         showPin
                         isFavorite={favoriteRoutes.includes(item.to)}
                         onToggleFavorite={toggleFavorite}
-                      />
+                      badge={badgeForRoute(item.to)}
+                    />
                     ))}
                   </div>
                 </section>
@@ -533,7 +708,11 @@ export function Layout() {
             </div>
           )}
 
-          <nav className="flex-1 px-2 py-4 overflow-y-auto">
+          <nav
+            ref={sidebarNavRef}
+            onKeyDown={handleSidebarNavigationKeyDown}
+            className="flex-1 px-2 py-4 overflow-y-auto"
+          >
             {groupedNav.map((group) => (
               <section key={group.id} className="mb-3">
                 {!sidebarCollapsed && (
@@ -550,6 +729,7 @@ export function Layout() {
                       showPin
                       isFavorite={favoriteRoutes.includes(item.to)}
                       onToggleFavorite={toggleFavorite}
+                      badge={badgeForRoute(item.to)}
                     />
                   ))}
                 </div>
@@ -584,14 +764,14 @@ export function Layout() {
         </aside>
 
         {sidebarOpen && (
-          <div className="md:hidden fixed inset-0 z-50 flex">
+          <div className="md:hidden fixed inset-0 z-50">
             <button
               type="button"
-              aria-label="Close navigation menu"
-              className="fixed inset-0 bg-black/60"
+              aria-label="Dismiss navigation overlay"
+              className="absolute inset-0 bg-black/60"
               onClick={() => setSidebarOpen(false)}
             />
-            <div className="relative w-72 bg-nexus-card flex flex-col animate-fade-in">
+            <div className="absolute inset-y-0 left-0 w-72 bg-nexus-card flex flex-col animate-fade-in">
               <div className="flex items-center justify-between px-5 h-16 border-b border-nexus-border">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center">
@@ -615,7 +795,12 @@ export function Layout() {
                     <p className="text-[11px] uppercase tracking-wider text-slate-500 font-semibold px-2 mb-1.5">{group.label}</p>
                     <div className="space-y-0.5">
                       {group.items.map((item) => (
-                        <NavItem key={`mobile-${item.to}`} item={item} onClick={() => setSidebarOpen(false)} />
+                        <NavItem
+                          key={`mobile-${item.to}`}
+                          item={item}
+                          onClick={() => setSidebarOpen(false)}
+                          badge={badgeForRoute(item.to)}
+                        />
                       ))}
                     </div>
                   </section>
@@ -637,19 +822,19 @@ export function Layout() {
 
         <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
           <header className="border-b border-nexus-border bg-nexus-card/70 backdrop-blur-md shrink-0">
-            <div className="h-14 md:h-16 px-4 md:px-6">
-              <div className="w-full h-full flex items-center gap-3">
-                <div className="flex items-center gap-3 min-w-0 flex-1 lg:max-w-[380px]">
+            <div className={cn(HEADER_HEIGHT_CLASS, 'px-3 sm:px-4 md:px-6')}>
+              <div className="grid h-full grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[minmax(220px,1fr)_minmax(280px,1.4fr)_minmax(220px,1fr)] sm:gap-3">
+                <div className="flex min-w-0 items-center gap-2 sm:gap-3">
                   <button
                     type="button"
                     onClick={() => setSidebarOpen(true)}
-                    className="md:hidden p-2 -ml-2 rounded-lg hover:bg-white/5"
+                    className="md:hidden p-2 -ml-1 rounded-lg hover:bg-white/5"
                     aria-label="Open navigation menu"
                   >
                     <Menu className="w-5 h-5 text-slate-400" />
                   </button>
 
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex min-w-0 items-center gap-2">
                     <div className="w-7 h-7 rounded-lg bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center shrink-0">
                       <pageMeta.icon className="w-4 h-4 text-indigo-300" />
                     </div>
@@ -660,7 +845,7 @@ export function Layout() {
                   </div>
                 </div>
 
-                <div className="hidden sm:flex min-w-0 flex-1 items-center justify-center">
+                <div className="hidden min-w-0 sm:flex sm:justify-center">
                   <div className="w-full max-w-xl">
                     <GlobalSearch
                       onAskAi={() => openChat()}
@@ -670,12 +855,13 @@ export function Layout() {
                   </div>
                 </div>
 
-                <div className="ml-auto flex items-center gap-1.5 shrink-0">
+                <div className="ml-auto flex min-w-0 items-center justify-end gap-1.5">
                   <div className="sm:hidden">
                     <GlobalSearch
                       onAskAi={() => openChat()}
                       onCreateAlert={() => navigate('/alerts')}
                       onCreateOrder={() => navigate('/asset/bitcoin')}
+                      enableHotkeys={false}
                     />
                   </div>
 
@@ -690,11 +876,31 @@ export function Layout() {
 
                   <NotificationCenter />
 
+                  {isHeaderBusy ? (
+                    <div className="hidden lg:flex h-7 w-[108px] animate-pulse rounded-full border border-white/10 bg-white/5" />
+                  ) : (
+                    <div
+                      title={aiMetaLabel}
+                      className={cn(
+                        'hidden lg:flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium whitespace-nowrap',
+                        aiStatusTone
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'h-1.5 w-1.5 rounded-full',
+                          aiLoading ? 'bg-violet-300 animate-pulse' : aiConnected ? 'bg-emerald-300' : 'bg-amber-300'
+                        )}
+                      />
+                      <span>{aiStatusLabel}</span>
+                    </div>
+                  )}
+
                   <button
                     type="button"
                     onClick={() => openChat()}
                     className={cn(
-                      'flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-lg text-sm font-medium transition-colors border',
+                      'flex shrink-0 items-center gap-2 whitespace-nowrap pl-2 pr-3 py-1.5 rounded-lg text-sm font-medium transition-colors border',
                       chatOpen
                         ? 'bg-violet-500/10 text-violet-300 border-violet-500/30'
                         : 'bg-white/5 text-slate-300 border-transparent hover:bg-white/10'
@@ -703,15 +909,8 @@ export function Layout() {
                     title={aiMetaLabel}
                     data-testid="desktop-ai-chat-toggle"
                   >
-                    <span
-                      className={cn(
-                        'w-2 h-2 rounded-full',
-                        aiLoading ? 'bg-violet-300 animate-pulse' : aiConnected ? 'bg-emerald-400' : 'bg-slate-500'
-                      )}
-                    />
-                    <span className="hidden lg:inline">Ask AI</span>
+                    <span className="hidden xl:inline">Ask AI</span>
                     <AiCompanion compact />
-                    <span className="hidden 2xl:inline text-[11px] text-slate-500">{aiMetaLabel}</span>
                   </button>
                 </div>
               </div>
@@ -770,6 +969,7 @@ export function Layout() {
         <nav className="md:hidden fixed bottom-0 left-0 right-0 h-[calc(4rem+env(safe-area-inset-bottom))] pb-[max(0.5rem,env(safe-area-inset-bottom))] bg-nexus-card border-t border-nexus-border flex items-center justify-around px-2 z-40">
           {mobileNavItems.map((item) => {
             const Icon = item.icon;
+            const badge = badgeForRoute(item.to);
             return (
               <NavLink
                 key={`mobile-nav-${item.to}`}
@@ -781,7 +981,23 @@ export function Layout() {
                   )
                 }
               >
-                <Icon className="w-5 h-5" />
+                <div className="relative">
+                  <Icon className="w-5 h-5" />
+                  {badge && (
+                    <span
+                      className={cn(
+                        'absolute -top-0.5 -right-1 h-1.5 w-1.5 rounded-full',
+                        badge.toneClass.includes('red')
+                          ? 'bg-red-400'
+                          : badge.toneClass.includes('amber')
+                          ? 'bg-amber-400'
+                          : badge.toneClass.includes('emerald')
+                          ? 'bg-emerald-400'
+                          : 'bg-indigo-400'
+                      )}
+                    />
+                  )}
+                </div>
                 <span className="text-xs font-medium">{item.mobileLabel ?? item.label}</span>
               </NavLink>
             );
@@ -795,7 +1011,7 @@ export function Layout() {
             type="button"
             onClick={() => openChat()}
             className={cn(
-              'md:hidden fixed right-4 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg shadow-purple-500/25 items-center justify-center hover:scale-105 active:scale-95 transition-transform bottom-[calc(5.25rem+env(safe-area-inset-bottom))]',
+              'md:hidden fixed right-4 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 text-white shadow-lg shadow-purple-500/25 items-center justify-center hover:scale-105 active:scale-95 transition-transform bottom-[calc(5.75rem+env(safe-area-inset-bottom))]',
               sidebarOpen ? 'hidden' : 'flex'
             )}
             aria-label="Open AI Chat"

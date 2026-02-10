@@ -212,7 +212,7 @@ export async function getCommandCenter(): Promise<AiCommandCenter> {
     headline: 'Command center unavailable in local mode. Enable backend AI for proactive guidance.',
     posture: 'neutral',
     confidence: 45,
-    topActions: ['Enable backend AI mode in Settings.'],
+    topActions: ['Enable backend mode (VITE_BACKEND_MODE=on) to unlock live AI.'],
     blockers: [],
     opportunities: [],
     watchlistFocus: [],
