@@ -1,5 +1,5 @@
 // Two-tier cache: L1 (in-memory) → L2 (localStorage) → API call
-// Backend migration: swap this for RedisCacheService
+// Backend mode uses server-side caching under api/_lib; this client cache remains for browser-only reads
 
 import { getItemWithMigration } from '@/utils/storageMigration';
 

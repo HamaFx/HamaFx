@@ -29,7 +29,7 @@ function withDefaultHeaders(headers?: HeadersInit): Headers {
     out.set('content-type', 'application/json');
   }
 
-  const bypass = import.meta.env.PLAYWRIGHT_PROTECTION_BYPASS as string | undefined;
+  const bypass = import.meta.env.VITE_PLAYWRIGHT_PROTECTION_BYPASS as string | undefined;
   if (bypass && !out.has('x-vercel-protection-bypass')) {
     out.set('x-vercel-protection-bypass', bypass);
   }
