@@ -22,4 +22,23 @@ describe('forexSessions', () => {
     expect(open.state).toBe('open');
     expect(isForexMarketTradable(new Date('2026-02-10T10:00:00.000Z'))).toBe(true);
   });
+
+  it('handles session boundary timestamps around rollover and weekend reopen', () => {
+    const cases = [
+      { at: '2026-02-06T19:59:59.000Z', expected: 'open' },
+      { at: '2026-02-06T20:00:00.000Z', expected: 'thin_liquidity' },
+      { at: '2026-02-06T21:30:00.000Z', expected: 'rollover' },
+      { at: '2026-02-06T21:59:59.000Z', expected: 'rollover' },
+      { at: '2026-02-06T22:00:00.000Z', expected: 'weekend_closed' },
+      { at: '2026-02-08T21:59:59.000Z', expected: 'weekend_closed' },
+      { at: '2026-02-08T22:00:00.000Z', expected: 'rollover' },
+      { at: '2026-02-09T00:29:59.000Z', expected: 'rollover' },
+      { at: '2026-02-09T00:30:00.000Z', expected: 'thin_liquidity' },
+    ] as const;
+
+    for (const item of cases) {
+      const snapshot = getForexSessionSnapshot(new Date(item.at));
+      expect(snapshot.state, item.at).toBe(item.expected);
+    }
+  });
 });
